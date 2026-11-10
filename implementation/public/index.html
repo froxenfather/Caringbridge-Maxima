@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CaringBridge first post</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 34rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin-top: 2rem; }
+    .row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid #8884; }
+    .ok { color: #1a8f3c; }
+    .bad { color: #d33a3a; }
+    .muted { opacity: 0.65; }
+    button { font: inherit; padding: 0.5rem 0.9rem; margin-top: 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>CaringBridge first post</h1>
+  <p class="muted">A placeholder page that shows the backend is running. The real screens come from the Figma board.</p>
+
+  <div class="row"><span>This page</span><span class="ok">Loaded from <span id="host"></span></span></div>
+  <div class="row"><span>Backend</span><span id="backend" class="muted">Checking...</span></div>
+  <div class="row"><span>AI key</span><span id="key" class="muted">Checking...</span></div>
+  <div class="row"><span>Groq connection</span><span id="groq" class="muted">Not tested yet</span></div>
+  <button id="test">Test Groq connection</button>
+
+  <h2>The questions the backend will ask</h2>
+  <ol id="questions"><li class="muted">Loading...</li></ol>
+
+  <script>
+    const $ = id => document.getElementById(id);
+
+    function show(id, text, kind) {
+      $(id).textContent = text;
+      $(id).className = kind;
+    }
+
+    async function get(path) {
+      const reply = await fetch("/api/v1" + path);
+      if (!reply.ok) throw new Error("HTTP " + reply.status);
+      return reply.json();
+    }
+
+    $("host").textContent = location.host;
+
+    get("/health").then(health => {
+      const where = [health.environment, health.commit].filter(Boolean).join(", ");
+      show("backend", "Running" + (where ? " (" + where + ")" : ""), "ok");
+      show("key", health.ai_key_set ? "Set" : "Missing, add AI_API_KEY", health.ai_key_set ? "ok" : "bad");
+    }).catch(err => {
+      show("backend", "Not reachable (" + err.message + ")", "bad");
+      show("key", "Unknown", "muted");
+    });
+
+    get("/flow").then(flow => {
+      $("questions").replaceChildren(...flow.questions.map(question => {
+        const item = document.createElement("li");
+        item.textContent = question.title;
+        return item;
+      }));
+    }).catch(() => {
+      $("questions").innerHTML = '<li class="bad">Could not load the questions</li>';
+    });
+
+    $("test").addEventListener("click", async () => {
+      show("groq", "Testing...", "muted");
+      try {
+        const result = await get("/check");
+        const text = result.ai.join(" ");
+        show("groq", text, text.includes("is available") ? "ok" : "bad");
+      } catch (err) {
+        show("groq", "Failed (" + err.message + ")", "bad");
+      }
+    });
+  </script>
+</body>
+</html>
