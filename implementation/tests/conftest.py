@@ -32,5 +32,6 @@ ANSWERS = {
     "help": ["meals", "prayers"],
     "help_other": "She loves tulips.",
     "update_frequency": "weekly",
-    "reach_out": "text",
+    "reach_out": ["comments", "candle"],
+    "profile": {"author_name": "Sam", "page_for": "Mom", "relationship": "son"},
 }

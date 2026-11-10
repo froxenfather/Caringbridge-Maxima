@@ -8,14 +8,24 @@ def test_answers_are_tidied():
     tidy = writer.validate_answers({"what_happened": "  Mom fell.  ", "help": ["prayers", "meals", "meals"]})
     assert tidy["what_happened"] == "Mom fell."
     assert tidy["help"] == ["meals", "prayers"]  # menu order, no repeats
-    assert tidy["reach_out"] == ""
+    assert tidy["reach_out"] == []
+    assert tidy["profile"] == {"author_name": "", "page_for": "", "relationship": ""}
+
+
+def test_reaching_out_can_pick_several_in_menu_order():
+    tidy = writer.validate_answers({"what_happened": "x", "reach_out": ["candle", "comments", "candle"]})
+    assert tidy["reach_out"] == ["comments", "candle"]
 
 
 def test_bad_answers_are_refused():
     with pytest.raises(ValueError, match="know"):
         writer.validate_answers({"help": ["unicorns"]})
     with pytest.raises(ValueError, match="know"):
-        writer.validate_answers({"what_happened": "x", "reach_out": "carrier pigeon"})
+        writer.validate_answers({"what_happened": "x", "reach_out": ["carrier_pigeon"]})
+    with pytest.raises(ValueError, match="know"):
+        writer.validate_answers({"what_happened": "x", "update_frequency": "hourly"})
+    with pytest.raises(ValueError, match="too long"):
+        writer.validate_answers({"what_happened": "x", "profile": {"author_name": "S" * 101}})
     with pytest.raises(ValueError, match="too long"):
         writer.validate_answers({"what_happened": "x" * (writer.MAX_TEXT + 1)})
     with pytest.raises(ValueError, match="first"):
@@ -38,10 +48,27 @@ def test_the_middle_slider_position_says_nothing():
 
 def test_first_prompt_has_every_answer_and_no_rewrite_sections():
     prompt = writer.build_prompt(writer.validate_answers(ANSWERS))
-    for expected in ["Mom fell last week", "Surgery is on Thursday", "Meals, Prayers", "tulips", "Updates: Weekly",
-                     "People can reach out by: Text me"]:
+    for expected in ["Mom fell last week", "Surgery is on Thursday", "Meals, Prayers", "tulips", "Updates: About once a week",
+                     "People can reach out by: Comments and Reactions on the page, Light a candle on the page"]:
         assert expected in prompt
     assert "CURRENT DRAFT" not in prompt
+
+
+def test_the_stand_in_profile_reaches_the_prompt_and_missing_profile_says_so():
+    prompt = writer.build_prompt(writer.validate_answers(ANSWERS))
+    assert "ABOUT THE AUTHOR (from sign-up):\nAuthor: Sam; Writing about: Mom; Author's relationship to them: son" in prompt
+    bare = writer.build_prompt(writer.validate_answers({"what_happened": "Mom fell."}))
+    assert "ABOUT THE AUTHOR (from sign-up):\n(not provided)" in bare
+
+
+def test_the_flow_matches_what_the_front_end_needs():
+    from backend import flow
+    assert [q["id"] for q in flow.QUESTIONS] == ["what_happened", "what_next", "help", "staying_in_touch"]
+    assert [o["id"] for o in flow.HELP_OPTIONS][-2:] == ["pet_care", "fundraising"]
+    fields = {f["id"]: f for f in flow.QUESTIONS[3]["fields"]}
+    assert fields["update_frequency"]["multiple"] is False and fields["reach_out"]["multiple"] is True
+    for slider in flow.SLIDERS:
+        assert len(slider["labels"]) == 5 and slider["labels"][2] == "As it is"
 
 
 def test_unanswered_sections_say_so_instead_of_being_left_for_the_ai_to_fill():

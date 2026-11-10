@@ -182,7 +182,8 @@ def ask_questions(can_talk):
             print("\n" + question["title"])
             for field in question["fields"]:
                 print("\n  " + field["prompt"])
-                answers[field["id"]] = (pick(field["options"], many=False) or [""])[0]
+                picked = pick(field["options"], many=field["multiple"])
+                answers[field["id"]] = picked if field["multiple"] else (picked or [""])[0]
     return answers
 
 
@@ -193,9 +194,9 @@ def show_heard(answers):
         print("  %s: %s" % (name, answers[key] or "(skipped)"))
     ticked = [writer.label_for(flow.HELP_OPTIONS, h) for h in answers["help"]]
     print("  Help wanted: " + (", ".join(ticked) or "(none)"))
+    reach = ", ".join(writer.label_for(flow.REACH_OPTIONS, r) for r in answers["reach_out"])
     print("  Updates: %s. Reach out by: %s." % (
-        writer.label_for(flow.UPDATE_OPTIONS, answers["update_frequency"]) or "(skipped)",
-        writer.label_for(flow.REACH_OPTIONS, answers["reach_out"]) or "(skipped)"))
+        writer.label_for(flow.UPDATE_OPTIONS, answers["update_frequency"]) or "(skipped)", reach or "(skipped)"))
 
 
 def show_draft(draft):

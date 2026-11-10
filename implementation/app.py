@@ -15,7 +15,7 @@ from typing import List
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from backend import ai, flow, speech, writer
@@ -31,13 +31,20 @@ app.add_middleware(
 api = APIRouter(prefix="/api/v1")
 
 
+class Profile(BaseModel):
+    author_name: str = Field("", max_length=100)
+    page_for: str = Field("", max_length=100)
+    relationship: str = Field("", max_length=100)
+
+
 class Answers(BaseModel):
     what_happened: str = Field("", max_length=writer.MAX_TEXT)
     what_next: str = Field("", max_length=writer.MAX_TEXT)
     help: List[str] = []
     help_other: str = Field("", max_length=writer.MAX_TEXT)
     update_frequency: str = ""
-    reach_out: str = ""
+    reach_out: List[str] = []
+    profile: Profile = Field(default_factory=Profile)  # from the sign-up steps
 
 
 class Draft(BaseModel):
@@ -116,12 +123,16 @@ def check():
 
 app.include_router(api)
 
-PAGE = Path(__file__).parent / "public" / "index.html"
+class NoCacheFiles(StaticFiles):
+    # Credit to the D2 team, whose d2-team/app.py also turned caching off for its front end while developing.
+    # Without this the browser keeps showing an old copy of app.js after you edit it.
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
-@app.get("/", include_in_schema=False)
-def home():
-    # On Vercel the files in public/ are served for us, so this only matters when running on your own computer.
-    if PAGE.exists():
-        return FileResponse(PAGE)
-    return {"status": "ok", "api": "/api/v1/health"}
+# Vercel serves the files in public/ itself and its docs say not to mount that folder, so this is only for running on your own computer.
+# It goes last so the API routes above win.
+if not setting("VERCEL"):
+    app.mount("/", NoCacheFiles(directory=Path(__file__).parent / "public", html=True), name="public")

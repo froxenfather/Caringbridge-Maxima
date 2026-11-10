@@ -32,6 +32,7 @@ def test_draft(fake_ai):
     assert response.status_code == 200
     assert response.json() == {"title": "A new chapter", "post": "We got news this week.", "privacy_flags": []}
     assert len(fake_ai.calls) == 1
+    assert "Author: Sam" in fake_ai.calls[0]["user"] and "Light a candle on the page" in fake_ai.calls[0]["user"]
 
 
 def test_bad_answers_are_a_400_and_never_reach_the_ai(fake_ai):
@@ -88,11 +89,14 @@ def test_health_says_whether_a_key_is_set_but_never_shows_it(monkeypatch):
     assert client.get(API + "/health").json()["ai_key_set"] is False
 
 
-def test_the_home_page_is_served_when_running_locally():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "CaringBridge first post" in response.text
-    assert 'get("/health")' in response.text and 'get("/check")' in response.text
+def test_the_pages_are_served_when_running_locally():
+    home = client.get("/")
+    assert home.status_code == 200 and "app.js" in home.text and "styles.css" in home.text
+    assert client.get("/app.js").status_code == 200
+    assert client.get("/styles.css").status_code == 200
+    status = client.get("/status.html")
+    assert status.status_code == 200 and 'get("/health")' in status.text and 'get("/check")' in status.text
+    assert client.get(API + "/health").status_code == 200  # the API still wins over the static files
 
 
 def test_what_people_write_never_reaches_the_logs(monkeypatch, fake_ai, caplog):
