@@ -15,7 +15,7 @@ let tweaks = TWEAKS_START();  // the slider positions and the "tell us what to c
 // Credit to the D2 team for keeping the session in the browser tab, which follows the sessionStorage recovery in d2-team/frontend/app.js.
 // It survives a refresh, it is gone when the tab closes, and nothing is kept on the server.
 function blank() {
-  return { step: "intro", path: "guide", draft: null,
+  return { step: "intro", path: "guide", draft: null, self_draft: { title: "", post: "" },
     answers: { what_happened: "", what_next: "", help: [], help_other: "", update_frequency: "", reach_out: [] } };
 }
 
@@ -84,7 +84,10 @@ function startOver() {
 }
 
 function render() {
-  const screen = state.step === "intro" ? introScreen() : state.step === "draft" ? draftScreen() : questionScreen();
+  const screen = state.step === "intro" ? introScreen()
+    : state.step === "draft" ? draftScreen()
+    : state.step === "write" ? selfWriteScreen()
+    : questionScreen();
   document.getElementById("app").replaceChildren(screen);
 }
 
@@ -124,7 +127,7 @@ function introScreen() {
     h("span", {}, h("strong", {}, title), h("span", { class: "card-text" }, text)));
 
   const next = () => {
-    if (state.path !== "guide") return say("Oops, writing it yourself hasn't been built yet. Could you pick the first option, Help Me Find the Words, for now?");
+    if (state.path === "blank") return go("write");
     go(flow.questions[0].id);
   };
   return wizard(
@@ -138,6 +141,31 @@ function introScreen() {
     primary("Next Step", next),
     links(["Previous", () => say("The earlier steps aren't part of this prototype yet.")],
       ["Skip for now", () => say("Skipping the writing step isn't built yet. Could you try the first option?")]));
+}
+
+// Writing it yourself
+
+function selfWriteScreen() {
+  if (!state.self_draft) state.self_draft = { title: "", post: "" };
+  const self = state.self_draft;
+  const titleInput = h("input", { class: "text", id: "self-title", type: "text",
+    placeholder: "Give your post a title",
+    value: self.title,
+    oninput: e => { self.title = e.target.value; save(); } });
+  const postArea = h("textarea", { class: "text post", id: "self-post",
+    placeholder: "Start with whatever comes to mind.",
+    oninput: e => { self.post = e.target.value; save(); } }, self.post);
+  const fields = h("div", { class: "write-screen" },
+    h("label", { for: "self-title" }, "Title"), titleInput,
+    h("label", { for: "self-post" }, "Post"), postArea);
+  return wizard(
+    h("p", { class: "eyebrow" }, "Step 2 of 4 · Write your post"),
+    heading("Write Your Post"),
+    h("p", { class: "lead" }, "It's your story — write it your way."),
+    fields,
+    noticeBox(),
+    primary("Next Step", () => say("The next step, adding a photo, isn't built yet. Your post is safe here.")),
+    links(["Previous", () => go("intro")], ["Start over", startOver]));
 }
 
 // Questions 1 to 4
@@ -359,7 +387,7 @@ function draftScreen() {
 async function start() {
   try { flow = await api("/flow"); }
   catch (err) { document.getElementById("app").textContent = err.message; return; }
-  const known = ["intro", "draft", ...flow.questions.map(q => q.id)];
+  const known = ["intro", "draft", "write", ...flow.questions.map(q => q.id)];
   if (!known.includes(state.step) || (state.step === "draft" && !state.draft)) state.step = "intro";
   render();
 }

@@ -79,6 +79,8 @@ label.other .text { margin-top: 0.35rem; }
 .link { background: none; border: 0; padding: 0; color: var(--plum); text-decoration: underline; cursor: pointer; }
 .notice { margin: 0.75rem 0 0; padding: 0.7rem 0.9rem; border-left: 4px solid var(--plum); border-radius: 4px; background: var(--plum-tint); font-size: 0.95rem; }
 
+.write-screen label { display: block; margin: 1rem 0 0.35rem; font-weight: 500; }
+
 /* The draft screen: the post on the left, the Make It Feel Right cards on the right. */
 .draft { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 2rem; max-width: 70rem; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
 .banner { margin: 0 0 1.25rem; padding: 0.75rem 1rem; border-radius: 6px; background: var(--green-tint); }
