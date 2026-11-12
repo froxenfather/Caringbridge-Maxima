@@ -11,11 +11,12 @@ let notice = "";        // a gentle message shown above the buttons
 let busy = "";          // what we're waiting on: "draft", "rewrite" or "transcribe"
 let recording = null;   // the microphone while someone is talking
 let tweaks = TWEAKS_START();  // the slider positions and the "tell us what to change" text
+let photoURL = null;          // blob URL for the photo preview; lives in memory only, gone on refresh
 
 // Credit to the D2 team for keeping the session in the browser tab, which follows the sessionStorage recovery in d2-team/frontend/app.js.
 // It survives a refresh, it is gone when the tab closes, and nothing is kept on the server.
 function blank() {
-  return { step: "intro", path: "guide", draft: null, self_draft: { title: "", post: "" },
+  return { step: "intro", path: "guide", draft: null, self_draft: { title: "", post: "" }, privacy: "",
     answers: { what_happened: "", what_next: "", help: [], help_other: "", update_frequency: "", reach_out: [] } };
 }
 
@@ -78,6 +79,7 @@ function say(message) {
 
 function startOver() {
   if (!confirm("Start over? Your answers and draft will be cleared.")) return;
+  if (photoURL) { URL.revokeObjectURL(photoURL); photoURL = null; }
   state = blank();
   tweaks = TWEAKS_START();
   go("intro");
@@ -87,6 +89,8 @@ function render() {
   const screen = state.step === "intro" ? introScreen()
     : state.step === "draft" ? draftScreen()
     : state.step === "write" ? selfWriteScreen()
+    : state.step === "photo" ? photoScreen()
+    : state.step === "privacy" ? privacyScreen()
     : questionScreen();
   document.getElementById("app").replaceChildren(screen);
 }
@@ -101,22 +105,30 @@ const links = (left, right) => h("div", { class: "links" },
   right ? h("button", { type: "button", class: "link", onclick: right[1] }, right[0]) : null);
 
 const SIDE_STEPS = [
-  ["Create a new CaringBridge", "Who the CaringBridge is for", "done"],
-  ["Write your first post", "Share an update with family & friends", "current"],
-  ["Upload a photo", "Personalize by adding a photo", ""],
-  ["Privacy settings", "Decide who can interact with your CaringBridge", ""],
+  ["Create a new CaringBridge", "Who the CaringBridge is for"],
+  ["Write your first post", "Share an update with family & friends"],
+  ["Upload a photo", "Personalize by adding a photo"],
+  ["Privacy settings", "Decide who can interact with your CaringBridge"],
 ];
 
+function currentSideStep() {
+  if (state.step === "photo") return 2;
+  if (state.step === "privacy") return 3;
+  return 1;
+}
+
 function wizard(...content) {
+  const sideStep = currentSideStep();
   return h("div", { class: "wizard" },
     h("section", { class: "wizard-main" },
       h("img", { class: "mobile-logo", src: "assets/logo-horizontal.svg", alt: "CaringBridge" }),
       h("div", { class: "step-box" }, ...content),
-      h("div", { class: "progress" }, [0, 1, 2, 3].map(i => h("span", { class: i === 1 ? "on" : "" })))),
+      h("div", { class: "progress" }, [0, 1, 2, 3].map(i => h("span", { class: i === sideStep ? "on" : "" })))),
     h("aside", { class: "wizard-side" },
       h("img", { class: "side-logo", src: "assets/logo-stacked-white.svg", alt: "CaringBridge" }),
-      h("ol", { class: "steps" }, SIDE_STEPS.map(([title, text, kind], i) =>
-        h("li", { class: kind }, h("small", {}, "Step " + (i + 1)), h("b", {}, title), text)))));
+      h("ol", { class: "steps" }, SIDE_STEPS.map(([title, text], i) =>
+        h("li", { class: i < sideStep ? "done" : i === sideStep ? "current" : "" },
+          h("small", {}, "Step " + (i + 1)), h("b", {}, title), text)))));
 }
 
 // The first screen
@@ -164,8 +176,71 @@ function selfWriteScreen() {
     h("p", { class: "lead" }, "It's your story — write it your way."),
     fields,
     noticeBox(),
-    primary("Next Step", () => say("The next step, adding a photo, isn't built yet. Your post is safe here.")),
+    primary("Next Step", () => go("photo")),
     links(["Previous", () => go("intro")], ["Start over", startOver]));
+}
+
+// Photo upload
+
+function photoScreen() {
+  const fileInput = h("input", { type: "file", accept: "image/*", id: "photo-file",
+    onchange: e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (photoURL) URL.revokeObjectURL(photoURL);
+      photoURL = URL.createObjectURL(file);
+      render();
+    } });
+
+  const uploadArea = photoURL
+    ? h("div", { class: "photo-upload" },
+        h("img", { class: "photo-preview", src: photoURL, alt: "Your photo preview" }),
+        h("div", { class: "photo-actions" },
+          h("button", { type: "button", class: "link", onclick: () => fileInput.click() }, "Change photo"),
+          h("button", { type: "button", class: "link", onclick: () => { URL.revokeObjectURL(photoURL); photoURL = null; render(); } }, "Remove")),
+        fileInput)
+    : h("div", { class: "photo-upload" },
+        h("label", { for: "photo-file", class: "photo-drop" },
+          h("span", {}, "Choose a photo"),
+          h("span", { class: "photo-hint" }, "JPG, PNG or GIF")),
+        fileInput);
+
+  const back = state.path === "blank" ? "write" : "draft";
+  return wizard(
+    h("p", { class: "eyebrow" }, "Step 3 of 4 · Upload a photo"),
+    heading("Add a Photo"),
+    h("p", { class: "lead" }, "A photo helps visitors connect with your CaringBridge. You can add or change it later."),
+    uploadArea,
+    noticeBox(),
+    primary("Next Step", () => go("privacy")),
+    links(["Previous", () => go(back)], ["Skip for now", () => go("privacy")]));
+}
+
+// Privacy settings
+
+function privacyScreen() {
+  const options = [
+    { id: "public",   label: "Anyone with the link",    text: "Anyone who has the link to your page can read your posts." },
+    { id: "approval", label: "With your approval",      text: "Visitors can request access, and you decide who can read your posts." },
+    { id: "invite",   label: "By invite only",          text: "Only people you personally invite can read your posts." },
+  ];
+  const cards = options.map(opt =>
+    h("label", { class: "card" + (state.privacy === opt.id ? " selected" : "") },
+      h("input", { type: "radio", name: "privacy", checked: state.privacy === opt.id,
+        onchange: () => { state.privacy = opt.id; notice = ""; save(); render(); } }),
+      h("span", {}, h("strong", {}, opt.label), h("span", { class: "card-text" }, opt.text))));
+
+  return wizard(
+    h("p", { class: "eyebrow" }, "Step 4 of 4 · Privacy settings"),
+    heading("Who Can See Your Page?"),
+    h("p", { class: "lead" }, "You can change this any time from your page settings."),
+    ...cards,
+    noticeBox(),
+    primary("Publish Post", () => {
+      if (!state.privacy) return say("Please choose a privacy setting to continue.");
+      say("Your post is ready! Publishing isn't wired up in this prototype yet.");
+    }),
+    links(["Previous", () => go("photo")], null));
 }
 
 // Questions 1 to 4
@@ -367,7 +442,7 @@ function draftScreen() {
     draft.privacy_flags.length ? h("p", { class: "notice" }, "Heads up, this looks like contact details: " + draft.privacy_flags.map(f => f.text).join(", ") + ". You decide what stays in.") : null,
     h("p", { class: "fine" }, flow.ai_notice),
     noticeBox(),
-    primary("Next Step", () => say("The next step, adding a photo, isn't built yet. Your draft is safe here.")),
+    primary("Next Step", () => go("photo")),
     links(["Back to answers", () => go(flow.questions[0].id)], ["Start over", startOver]));
 
   const feel = h("div", { class: "panel" }, h("h2", {}, "Make It Feel Right"), h("p", { class: "fine" }, "Nothing changes until you say so."),
@@ -387,7 +462,7 @@ function draftScreen() {
 async function start() {
   try { flow = await api("/flow"); }
   catch (err) { document.getElementById("app").textContent = err.message; return; }
-  const known = ["intro", "draft", "write", ...flow.questions.map(q => q.id)];
+  const known = ["intro", "draft", "write", "photo", "privacy", ...flow.questions.map(q => q.id)];
   if (!known.includes(state.step) || (state.step === "draft" && !state.draft)) state.step = "intro";
   render();
 }
