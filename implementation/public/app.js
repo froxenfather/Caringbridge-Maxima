@@ -310,13 +310,17 @@ async function makeDraft() {
 
 // One call carries the sliders and the text box together, along with the draft as the author has edited it.
 async function rewrite() {
+  if (!state.draft.post.trim()) return say("There's nothing in the post to rewrite yet. Type something, or go back to your answers.");
   busy = "rewrite";
   notice = "";
   render();
   try {
-    state.draft = await post("/regenerate", { answers: answersForApi(), draft: { title: state.draft.title, post: state.draft.post }, adjustments: tweaks });
+    const result = await post("/regenerate", { answers: answersForApi(), draft: { title: state.draft.title, post: state.draft.post }, adjustments: tweaks });
+    const same = result.post.trim() === state.draft.post.trim();
+    state.draft = { ...result, title: result.title || state.draft.title };  // a rewrite never swaps the title for nothing
     tweaks = TWEAKS_START();
     save();
+    if (same) notice = "That came back the same as before. Try a bigger change, or tell us in your own words what to change.";
   } catch (err) {
     notice = err.message;
   }

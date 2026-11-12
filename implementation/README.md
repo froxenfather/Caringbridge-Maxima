@@ -95,6 +95,12 @@ The pieces that come from them are marked with a comment next to the code.
 - Turning caching off for local development in `app.py`, and the way `voice_to_post.py` decides someone has finished talking, follow `d2-team/app.py`, `d2-team/frontend/audio.js` and `d2-team/backend/stt/vad.py`.
 - Reading settings from a `.env` file follows `d2-team/backend/config.py`, and the error handling in `app.py` follows `d2-team/app.py`.
 
+## If the writing helper says it's busy
+
+Groq's free plan limits how many requests and how much text you can send in a minute, so pressing the buttons many times in a row can show "The writing helper is busy right now".
+Waiting a minute fixes it, and the draft is never touched when that happens.
+If a rewrite ever fails for another reason, the server logs a line like "The AI sent back no usable post", which you can find in the terminal or in Vercel's logs.
+
 ## Not done yet
 
 - "I'd Like to Write It Myself", and Steps 1, 3 and 4 of the CaringBridge sign-up.

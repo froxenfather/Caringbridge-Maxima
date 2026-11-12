@@ -15,13 +15,15 @@ def fake_ai(monkeypatch):
     Records every prompt it is given."""
     class Fake:
         calls = []
+        replies = []  # given out first, one per call, before it falls back to reply
         reply = json.dumps({"title": "A new chapter", "post": "We got news this week."})
 
     def call_ai(system, user):
         Fake.calls.append({"system": system, "user": user})
-        return Fake.reply
+        return Fake.replies.pop(0) if Fake.replies else Fake.reply
 
     Fake.calls = []
+    Fake.replies = []
     monkeypatch.setattr(ai, "call_ai", call_ai)
     return Fake
 

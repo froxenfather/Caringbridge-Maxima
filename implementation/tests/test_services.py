@@ -92,3 +92,11 @@ def test_setup_check_reports_a_missing_model(monkeypatch):
     assert "isn't in the list" in ai.check()[0]
     monkeypatch.setattr(requests, "get", lambda *a, **k: Reply({"data": [{"id": "my-model"}]}))
     assert "available" in ai.check()[0]
+
+
+def test_a_rate_limit_says_the_helper_is_busy(monkeypatch):
+    monkeypatch.setenv("AI_API_KEY", "secret")
+    monkeypatch.setattr(requests, "post", lambda *a, **k: Reply(status=429))
+    with pytest.raises(ai.AIError, match="busy") as err:
+        ai.call_ai("rules", "question")
+    assert err.value.busy is True

@@ -113,3 +113,20 @@ def test_what_people_write_never_reaches_the_logs(monkeypatch, fake_ai, caplog):
     monkeypatch.setattr(requests, "post", offline)
     assert client.post(API + "/draft", json=secret).status_code == 502
     assert "ZEBRA-PRIVATE-STORY" not in caplog.text
+
+
+def test_a_busy_ai_is_a_429_the_page_can_show_as_it_is(monkeypatch):
+    def busy(system, user):
+        raise ai.AIError("The writing helper is busy right now. Please wait a minute and try again.", busy=True)
+
+    monkeypatch.setattr(ai, "call_ai", busy)
+    response = client.post(API + "/draft", json=ANSWERS)
+    assert response.status_code == 429 and "busy" in response.json()["detail"]
+
+
+def test_an_empty_ai_reply_is_an_error_and_the_draft_is_left_alone(fake_ai):
+    fake_ai.reply = ""
+    response = client.post(API + "/regenerate", json={
+        "answers": ANSWERS, "draft": {"title": "Mine", "post": "My words."}, "adjustments": {"tone": 5}})
+    assert response.status_code == 502 and "usable draft" in response.json()["detail"]
+    assert len(fake_ai.calls) == 2  # it tried once more before giving up

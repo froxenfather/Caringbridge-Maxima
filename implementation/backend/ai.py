@@ -10,7 +10,12 @@ log = logging.getLogger("backend.ai")
 
 class AIError(Exception):
     """Something went wrong talking to the AI.
-    The message is safe to show a person."""
+    The message is safe to show a person.
+    busy is True when the service is only asking us to slow down, so the person can be told to wait a moment."""
+
+    def __init__(self, message, busy=False):
+        super().__init__(message)
+        self.busy = busy
 
 
 def base_url():
@@ -47,10 +52,15 @@ def call_ai(system, user):
     try:
         reply = requests.post(base_url() + "/chat/completions", json=body, headers=auth_headers(), timeout=60)
         reply.raise_for_status()
-        text = reply.json()["choices"][0]["message"]["content"]
+        choice = reply.json()["choices"][0]
+        text = choice["message"]["content"]
+        if not (text or "").strip():
+            log.warning("The AI sent back no text (finish_reason=%s)", choice.get("finish_reason"))
     except requests.HTTPError as err:
         status = err.response.status_code
         log.warning("AI request failed with HTTP %s", status)
+        if status == 429:
+            raise AIError("The writing helper is busy right now. Please wait a minute and try again.", busy=True) from err
         raise AIError("The AI service turned the request down (HTTP %s). Check AI_API_KEY and AI_MODEL." % status) from err
     except (requests.RequestException, KeyError, IndexError, ValueError) as err:
         log.warning("AI request failed: %s", type(err).__name__)

@@ -73,7 +73,10 @@ def run(work):
         return work()
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err))
-    except (ai.AIError, speech.SpeechError) as err:
+    except ai.AIError as err:
+        # 429 means "slow down", which the page can show as it is, and anything else is a real failure.
+        raise HTTPException(status_code=429 if err.busy else 502, detail=str(err))
+    except speech.SpeechError as err:
         raise HTTPException(status_code=502, detail=str(err))
 
 
