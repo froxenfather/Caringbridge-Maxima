@@ -41,14 +41,20 @@ def auth_headers():
 def call_ai(system, user):
     """Send one prompt, get the model's reply as text.
     This is the only place a model is called, so switching providers (Bedrock, for example) means replacing just this function."""
+    model = setting("AI_MODEL", "openai/gpt-oss-20b")
     body = {
-        "model": setting("AI_MODEL", "openai/gpt-oss-20b"),
+        "model": model,
         "temperature": 0.4,
+        "max_tokens": 4000,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     }
+    # The gpt-oss models think before they answer, and a long think can use up the whole budget and leave no answer at all.
+    # Keeping the thinking light also makes the reply faster and uses less of Groq's per-minute limit.
+    if "gpt-oss" in model:
+        body["reasoning_effort"] = setting("AI_REASONING_EFFORT", "low")
     try:
         reply = requests.post(base_url() + "/chat/completions", json=body, headers=auth_headers(), timeout=60)
         reply.raise_for_status()

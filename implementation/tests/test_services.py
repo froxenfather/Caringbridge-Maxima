@@ -100,3 +100,27 @@ def test_a_rate_limit_says_the_helper_is_busy(monkeypatch):
     with pytest.raises(ai.AIError, match="busy") as err:
         ai.call_ai("rules", "question")
     assert err.value.busy is True
+
+
+def sent_body(monkeypatch, model):
+    seen = {}
+
+    def post(url, json=None, headers=None, timeout=None):
+        seen.update(json)
+        return Reply({"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]})
+
+    monkeypatch.setenv("AI_API_KEY", "secret")
+    monkeypatch.setenv("AI_MODEL", model)
+    monkeypatch.setattr(requests, "post", post)
+    ai.call_ai("rules", "question")
+    return seen
+
+
+def test_thinking_models_get_a_big_budget_and_light_thinking(monkeypatch):
+    body = sent_body(monkeypatch, "openai/gpt-oss-20b")
+    assert body["max_tokens"] == 4000 and body["reasoning_effort"] == "low"
+
+
+def test_other_models_are_not_sent_a_thinking_setting_they_might_reject(monkeypatch):
+    body = sent_body(monkeypatch, "llama-3.3-70b-versatile")
+    assert "reasoning_effort" not in body and body["max_tokens"] == 4000

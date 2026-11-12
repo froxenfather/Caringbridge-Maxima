@@ -65,7 +65,7 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
 
     assert len(fake_ai.calls) == 2  # one for the draft, one for the rewrite, nothing else
     first, rewrite = (c["user"] for c in fake_ai.calls)
-    assert "Meals, Prayers" in first and "Updates: About once a week" in first and "CURRENT DRAFT" not in first
+    assert "Meals, Prayers" in first and "post updates about once a week" in first and "CURRENT DRAFT" not in first
     assert "reach out by: Comments and Reactions on the page, Light a candle on the page" in first
     assert "CURRENT DRAFT" in rewrite and "mention the tulips" in rewrite and "We got news this week." in rewrite
 

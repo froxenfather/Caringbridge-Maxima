@@ -48,7 +48,7 @@ def test_the_middle_slider_position_says_nothing():
 
 def test_first_prompt_has_every_answer_and_no_rewrite_sections():
     prompt = writer.build_prompt(writer.validate_answers(ANSWERS))
-    for expected in ["Mom fell last week", "Surgery is on Thursday", "Meals, Prayers", "tulips", "Updates: About once a week",
+    for expected in ["Mom fell last week", "Surgery is on Thursday", "Meals, Prayers", "tulips", "post updates about once a week",
                      "People can reach out by: Comments and Reactions on the page, Light a candle on the page"]:
         assert expected in prompt
     assert "CURRENT DRAFT" not in prompt
@@ -187,3 +187,28 @@ def test_the_authors_own_instruction_can_change_the_title(fake_ai):
     fake_ai.reply = '{"title": "A shorter title", "post": "A new body."}'
     result = writer.regenerate(ANSWERS, {"title": "My own very long title", "post": "Old body."}, {"extra": "make the title shorter"})
     assert result["title"] == "A shorter title"
+
+
+def test_the_rules_ask_for_paragraph_breaks_the_json_can_carry():
+    assert "\n\n" in writer.SYSTEM_RULES  # the two characters backslash and n, which is how JSON writes a line break
+
+
+def test_a_rewrite_that_comes_back_unchanged_is_asked_for_again(fake_ai):
+    same = '{"title": "T", "post": "Old body."}'
+    better = '{"title": "T", "post": "A warmer body."}'
+    fake_ai.replies = [same, better]
+    result = writer.regenerate(ANSWERS, {"title": "T", "post": "Old body."}, {"tone": 5})
+    assert result["post"] == "A warmer body."
+    assert len(fake_ai.calls) == 2 and "identical to the CURRENT DRAFT" in fake_ai.calls[1]["user"]
+
+
+def test_nothing_is_asked_again_when_the_author_asked_for_nothing(fake_ai):
+    fake_ai.reply = '{"title": "T", "post": "Old body."}'
+    result = writer.regenerate(ANSWERS, {"title": "T", "post": "Old body."}, {})
+    assert result["post"] == "Old body." and len(fake_ai.calls) == 1
+
+
+def test_if_it_is_still_unchanged_after_asking_again_the_author_gets_it_back_and_is_told_by_the_page(fake_ai):
+    fake_ai.reply = '{"title": "T", "post": "Old body."}'
+    result = writer.regenerate(ANSWERS, {"title": "T", "post": "Old body."}, {"tone": 5})
+    assert result["post"] == "Old body." and len(fake_ai.calls) == 2
