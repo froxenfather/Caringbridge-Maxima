@@ -81,6 +81,14 @@ label.other .text { margin-top: 0.35rem; }
 
 .write-screen label { display: block; margin: 1rem 0 0.35rem; font-weight: 500; }
 
+.photo-upload { margin: 1rem 0; }
+.photo-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; border: 2px dashed var(--line); border-radius: 8px; padding: 2.5rem 1rem; cursor: pointer; text-align: center; color: var(--muted); }
+.photo-drop:hover { border-color: var(--plum); color: var(--plum); }
+.photo-upload input[type="file"] { display: none; }
+.photo-preview { max-width: 100%; max-height: 14rem; border-radius: 8px; display: block; margin: 0 auto; }
+.photo-hint { font-size: 0.8rem; }
+.photo-actions { display: flex; justify-content: center; gap: 1.5rem; margin-top: 0.75rem; font-size: 0.9rem; }
+
 /* The draft screen: the post on the left, the Make It Feel Right cards on the right. */
 .draft { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 2rem; max-width: 70rem; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
 .banner { margin: 0 0 1.25rem; padding: 0.75rem 1rem; border-radius: 6px; background: var(--green-tint); }
