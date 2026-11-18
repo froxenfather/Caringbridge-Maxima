@@ -29,9 +29,6 @@ def fake_ai(monkeypatch):
 ANSWERS = {
     "what_happened": "Mom fell last week and broke her hip.",
     "what_next": "Surgery is on Thursday.",
-    "help": ["meals", "prayers"],
-    "help_other": "She loves tulips.",
-    "update_frequency": "weekly",
-    "reach_out": ["comments", "candle"],
+    "help": ["rides", "prayers"],
     "profile": {"author_name": "Sam", "page_for": "Mom", "relationship": "son"},
 }

@@ -1,8 +1,8 @@
 # CaringBridge first post
 
 The "Help Me Find the Words" path of the first-post flow, as a web page backed by a small API.
-Four short questions, then an AI writes a first draft in the author's own words.
-The author edits it, nudges the length, tone and wording, and rewrites it with one more AI call.
+Three short questions, then an AI writes a first draft in the author's own words, titled "Today's Update".
+The author edits it, or types what they'd like changed and gets a rewrite from one more AI call, with the changed words highlighted.
 Nothing is ever published, and nothing is stored on the server.
 
 ## Run it on your computer
@@ -22,7 +22,8 @@ There is also a terminal version of the same flow, `python voice_to_post.py` (ad
 
 ## The screens
 
-Intro, then Questions 1 to 4, then the first draft with the Make It Feel Right sliders and the box to tell it what to change.
+Intro, then Questions 1 to 3 (what's happened so far, what's coming up next, and how others can help), then the first draft with a box under it to tell the AI what to change.
+Meals, gift cards and fundraising are deliberately not offered on Question 3, because CaringBridge has its own plans for those.
 The words on every question come from `backend/flow.py`, so a copy change from Figma is an edit in that one file.
 On the intro screen, choosing "I'd Like to Write It Myself" (or Previous, or Skip for now) shows a gentle "not built yet" message.
 The stand-in sign-up details (Sam writing about Robert) are at the top of `public/app.js` until the real sign-up steps are connected.
@@ -36,10 +37,10 @@ Nothing is kept on the server, so the page holds the answers and sends them with
 
 | Route | Does |
 |---|---|
-| `GET /api/v1/flow` | The questions, options and sliders to draw. |
+| `GET /api/v1/flow` | The questions and options to draw, and the default title. |
 | `POST /api/v1/transcribe` | Audio file in, `{text}` out. |
 | `POST /api/v1/draft` | `answers` in, `{title, post, privacy_flags}` out. |
-| `POST /api/v1/regenerate` | `answers`, `draft` (with the author's edits) and `adjustments` in, a new draft out. |
+| `POST /api/v1/regenerate` | `answers`, `draft` (with the author's edits) and `adjustments` (the web page sends only `extra`; the terminal tool also sends the sliders) in, a new draft out. |
 | `GET /api/v1/health` | Is it running, which deployment is answering, and whether a key is set (never the key). |
 | `GET /api/v1/check` | Whether Groq is reachable and the model exists. |
 
@@ -53,7 +54,7 @@ There is no login yet, so put authentication in front of it before it goes anywh
 | `public/index.html`, `styles.css`, `app.js` | The page, with no build step. |
 | `public/status.html` | The status page. |
 | `public/assets/` | The CaringBridge logos, from their media kit. |
-| `backend/flow.py` | The questions, options and sliders. |
+| `backend/flow.py` | The questions, options, default title, and the sliders the terminal tool uses. |
 | `backend/writer.py` | The prompt and the two functions everything calls, `first_draft` and `regenerate`. |
 | `backend/ai.py` | The one function that calls a model. |
 | `backend/speech.py` | The one function that turns audio into text. |

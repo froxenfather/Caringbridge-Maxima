@@ -1,64 +1,44 @@
-# Everything a person sees in the flow lives here, including the questions, the checkbox and button options, and the sliders.
+# Everything a person sees in the flow lives here, including the questions, the checkbox options, and the sliders.
+# The sliders are only used by the terminal tool now; the web page just has the "tell us what to change" box.
 # Change the wording or add an option in this file and the terminal tool and the API (GET /api/v1/flow) both follow.
 # The wording comes from the Figma board.
 
 AI_NOTICE = "This draft was written with AI, using your own words. You decide what gets posted."
 
+DEFAULT_TITLE = "Today's Update"
+
+# Meals and money (meal trains, gift cards, fundraising) are left out on purpose.
+# CaringBridge has its own plans for how those will be offered.
 HELP_OPTIONS = [
-    {"id": "meals", "label": "Meals"},
     {"id": "rides", "label": "Rides"},
-    {"id": "gift_cards", "label": "Gift cards"},
     {"id": "prayers", "label": "Prayers"},
     {"id": "visits", "label": "Visits"},
     {"id": "home_help", "label": "Help at home"},
     {"id": "pet_care", "label": "Pet care"},
-    {"id": "fundraising", "label": "Fundraising"},
-]
-
-UPDATE_OPTIONS = [
-    {"id": "every_few_days", "label": "Every few days"},
-    {"id": "weekly", "label": "About once a week"},
-    {"id": "when_news", "label": "When there's news"},
-]
-
-REACH_OPTIONS = [
-    {"id": "comments", "label": "Comments and Reactions on the page"},
-    {"id": "candle", "label": "Light a candle on the page"},
-    {"id": "text", "label": "Text me"},
-    {"id": "hold_off", "label": "Please hold off"},
 ]
 
 QUESTIONS = [
     {
         "id": "what_happened",
+        "step_label": "What's happened so far",
         "type": "voice",
-        "title": "What would you like friends and family to know?",
-        "prompt": "Type or talk whatever comes to mind. We'll help you find the words and tidy it up.",
+        "title": "What's happened so far?",
+        "prompt": "Catch people up on how you got here, like a diagnosis, a hospital stay, or how the last few days have gone. Type or talk, and we'll help tidy it up.",
     },
     {
         "id": "what_next",
+        "step_label": "What's coming up next",
         "type": "voice",
-        "title": "Help others understand what's next?",
-        "prompt": "Any treatments, appointments, or news you're waiting on. If you don't know yet, that's okay. You can skip this.",
+        "title": "What's coming up next?",
+        "prompt": "Any upcoming treatments, appointments, or news you're waiting on. If you don't know yet, that's okay. You can skip this.",
     },
     {
         "id": "help",
+        "step_label": "How others can help",
         "type": "checkboxes",
         "title": "How Can Others Help Right Now?",
-        "prompt": "People want to help. Pick anything that would make this week a little easier. We'll add it to Ways to Help, and you can change it anytime.",
+        "prompt": "People want to help. Pick anything that would make this week a little easier. You can change it anytime.",
         "options": HELP_OPTIONS,
-        "other_id": "help_other",
-        "other_prompt": "Anything else you'd like people to know? (Optional)",
-    },
-    {
-        "id": "staying_in_touch",
-        "type": "buttons",
-        "title": "Staying in Touch",
-        "fields": [
-            {"id": "update_frequency", "prompt": "How often do you think you'll share updates?", "options": UPDATE_OPTIONS, "multiple": False},
-            {"id": "reach_out", "prompt": "How would you like people to reach out?", "options": REACH_OPTIONS, "multiple": True},
-        ],
-        "note": "You'll choose who can see your page in Step 4.",
     },
 ]
 

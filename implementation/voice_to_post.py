@@ -115,7 +115,7 @@ def listen():
 
 
 def parse_picks(text, options):
-    """'1, 3' -> ['meals', 'gift_cards'].
+    """'1, 3' -> ['rides', 'visits'].
     Returns None if it isn't a valid list."""
     picked = []
     for word in text.replace(",", " ").split():
@@ -174,29 +174,18 @@ def ask_questions(can_talk):
         print("\nQuestion %d of %d" % (number, len(flow.QUESTIONS)), end="")
         if question["type"] == "voice":
             answers[question["id"]], can_talk = ask_voice(question, can_talk)
-        elif question["type"] == "checkboxes":
-            print("\n" + question["title"])
-            answers[question["id"]] = pick(question["options"])
-            answers[question["other_id"]] = input("  " + question["other_prompt"] + " ").strip()
         else:
             print("\n" + question["title"])
-            for field in question["fields"]:
-                print("\n  " + field["prompt"])
-                picked = pick(field["options"], many=field["multiple"])
-                answers[field["id"]] = picked if field["multiple"] else (picked or [""])[0]
+            answers[question["id"]] = pick(question["options"])
     return answers
 
 
 def show_heard(answers):
     print("\nHere's what we heard:")
-    for key, name in [("what_happened", "What happened"), ("what_next", "What happens next"),
-                      ("help_other", "Anything else")]:
+    for key, name in [("what_happened", "What happened"), ("what_next", "What happens next")]:
         print("  %s: %s" % (name, answers[key] or "(skipped)"))
     ticked = [writer.label_for(flow.HELP_OPTIONS, h) for h in answers["help"]]
     print("  Help wanted: " + (", ".join(ticked) or "(none)"))
-    reach = ", ".join(writer.label_for(flow.REACH_OPTIONS, r) for r in answers["reach_out"])
-    print("  Updates: %s. Reach out by: %s." % (
-        writer.label_for(flow.UPDATE_OPTIONS, answers["update_frequency"]) or "(skipped)", reach or "(skipped)"))
 
 
 def show_draft(draft):

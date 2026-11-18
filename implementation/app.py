@@ -41,9 +41,6 @@ class Answers(BaseModel):
     what_happened: str = Field("", max_length=writer.MAX_TEXT)
     what_next: str = Field("", max_length=writer.MAX_TEXT)
     help: List[str] = []
-    help_other: str = Field("", max_length=writer.MAX_TEXT)
-    update_frequency: str = ""
-    reach_out: List[str] = []
     profile: Profile = Field(default_factory=Profile)  # from the sign-up steps
 
 
@@ -81,7 +78,8 @@ def run(work):
 def get_flow():
     """The questions, options and sliders, so the front end draws them from here."""
     return {"questions": flow.QUESTIONS, "sliders": flow.SLIDERS,
-            "slider_default": flow.SLIDER_DEFAULT, "ai_notice": flow.AI_NOTICE}
+            "slider_default": flow.SLIDER_DEFAULT, "ai_notice": flow.AI_NOTICE,
+            "default_title": flow.DEFAULT_TITLE}
 
 
 @api.post("/draft")

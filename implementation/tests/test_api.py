@@ -22,17 +22,24 @@ API = "/api/v1"
 
 def test_flow_describes_what_the_front_end_should_draw():
     data = client.get(API + "/flow").json()
-    assert [q["id"] for q in data["questions"]] == ["what_happened", "what_next", "help", "staying_in_touch"]
+    assert [q["id"] for q in data["questions"]] == ["what_happened", "what_next", "help"]
     assert [s["id"] for s in data["sliders"]] == ["length", "tone", "wording"]
     assert data["slider_default"] == 3 and data["ai_notice"]
+    assert data["default_title"] == "Today's Update"
 
 
 def test_draft(fake_ai):
     response = client.post(API + "/draft", json=ANSWERS)
     assert response.status_code == 200
-    assert response.json() == {"title": "A new chapter", "post": "We got news this week.", "privacy_flags": []}
+    assert response.json() == {"title": "Today's Update", "post": "We got news this week.", "privacy_flags": []}
     assert len(fake_ai.calls) == 1
-    assert "Author: Sam" in fake_ai.calls[0]["user"] and "Light a candle on the page" in fake_ai.calls[0]["user"]
+    assert "Author: Sam" in fake_ai.calls[0]["user"] and "Rides, Prayers" in fake_ai.calls[0]["user"]
+
+
+def test_an_older_tab_with_removed_answers_still_works(fake_ai):
+    # A tab opened before Question 4 was removed still sends these; they are ignored.
+    old = {**ANSWERS, "help_other": "x", "update_frequency": "weekly", "reach_out": ["candle"]}
+    assert client.post(API + "/draft", json=old).status_code == 200
 
 
 def test_bad_answers_are_a_400_and_never_reach_the_ai(fake_ai):

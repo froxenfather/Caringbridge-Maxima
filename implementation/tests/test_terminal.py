@@ -39,11 +39,11 @@ def test_a_cough_is_not_an_answer():
 
 def test_checkbox_picks():
     options = flow.HELP_OPTIONS
-    assert cli.parse_picks("1, 3 5", options) == ["meals", "gift_cards", "visits"]
+    assert cli.parse_picks("1, 3 5", options) == ["rides", "visits", "pet_care"]
     assert cli.parse_picks("", options) == []
-    assert cli.parse_picks("2 2", options) == ["rides"]
+    assert cli.parse_picks("2 2", options) == ["prayers"]
     assert cli.parse_picks("9", options) is None
-    assert cli.parse_picks("meals", options) is None
+    assert cli.parse_picks("rides", options) is None
 
 
 def type_in(monkeypatch, lines):
@@ -55,8 +55,7 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
     type_in(monkeypatch, [
         "Mom fell and broke her hip.",   # question 1
         "Surgery is on Thursday.",       # question 2
-        "1,4", "She loves tulips.",      # question 3: meals, prayers, and the extra note
-        "2", "1,2",                      # question 4: about once a week, comments and candles
+        "1,2",                           # question 3: rides, prayers
         "",                              # see your first draft
         "a", "1", "", "5", "mention the tulips",   # adjust: shorter, tone left alone, own words, extra instruction
         "s",                             # save
@@ -65,8 +64,8 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
 
     assert len(fake_ai.calls) == 2  # one for the draft, one for the rewrite, nothing else
     first, rewrite = (c["user"] for c in fake_ai.calls)
-    assert "Meals, Prayers" in first and "Updates: About once a week" in first and "CURRENT DRAFT" not in first
-    assert "reach out by: Comments and Reactions on the page, Light a candle on the page" in first
+    assert "Rides, Prayers" in first and "CURRENT DRAFT" not in first
+    assert "Title: Today's Update" in rewrite  # the first draft's title went into the rewrite
     assert "CURRENT DRAFT" in rewrite and "mention the tulips" in rewrite and "We got news this week." in rewrite
 
     saved = list(tmp_path.glob("caringbridge_post_*.txt"))
@@ -77,14 +76,14 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
 
 
 def test_skipping_everything_asks_for_something_instead_of_calling_the_ai(monkeypatch, tmp_path, fake_ai, capsys):
-    type_in(monkeypatch, ["", "", "", "", "", "", ""])
+    type_in(monkeypatch, ["", "", "", ""])
     cli.main(["--text", "--out", str(tmp_path)])
     assert fake_ai.calls == []
     assert "Tell us a little" in capsys.readouterr().out
 
 
 def test_hand_edited_title_goes_into_the_rewrite(monkeypatch, tmp_path, fake_ai):
-    type_in(monkeypatch, ["Mom fell.", "", "", "", "", "", "", "e", "My own title", "n", "a", "", "", "", "", "q"])
+    type_in(monkeypatch, ["Mom fell.", "", "", "", "e", "My own title", "n", "a", "", "", "", "", "q"])
     cli.main(["--text", "--out", str(tmp_path)])
     assert "Title: My own title" in fake_ai.calls[1]["user"]
     assert list(tmp_path.iterdir()) == []  # quit without saving
@@ -102,7 +101,7 @@ def test_ai_trouble_keeps_the_answers_and_lets_you_retry(monkeypatch, tmp_path, 
         return real(system, user)
 
     monkeypatch.setattr(ai, "call_ai", flaky)
-    type_in(monkeypatch, ["Mom fell.", "", "", "", "", "", "", "", "s"])  # ... draft fails, Enter retries, then save
+    type_in(monkeypatch, ["Mom fell.", "", "", "", "", "s"])  # ... draft fails, Enter retries, then save
     cli.main(["--text", "--out", str(tmp_path)])
     assert len(list(tmp_path.glob("caringbridge_post_*.txt"))) == 1
 
@@ -112,7 +111,7 @@ def test_missing_microphone_package_falls_back_to_typing(monkeypatch, tmp_path, 
     monkeypatch.setitem(sys.modules, "sounddevice", None)  # makes "import sounddevice" fail
     # Question 1 presses Enter to talk, the mic is missing, so it falls back to typing the answer.
     # After that every question is typed, and we skip the rest.
-    type_in(monkeypatch, ["", "Mom fell.", "", "", "", "", "", "", "q"])
+    type_in(monkeypatch, ["", "Mom fell.", "", "", "", "q"])
     cli.main(["--out", str(tmp_path)])
     out = capsys.readouterr().out
     assert "python -m pip install sounddevice" in out

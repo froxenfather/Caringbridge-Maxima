@@ -3,21 +3,21 @@
 const PROFILE = { author_name: "Sam", page_for: "Robert", relationship: "son" };
 
 const MIC_LIMIT_SECONDS = 120;
-const TWEAKS_START = () => ({ length: 3, tone: 3, wording: 3, extra: "" });
 
-let flow = null;        // the questions and sliders from GET /api/v1/flow
+let flow = null;        // the questions from GET /api/v1/flow
 let state = load();     // everything the person has entered so far
 let notice = "";        // a gentle message shown above the buttons
 let busy = "";          // what we're waiting on: "draft", "rewrite" or "transcribe"
 let recording = null;   // the microphone while someone is talking
-let tweaks = TWEAKS_START();  // the slider positions and the "tell us what to change" text
-let photoURL = null;          // blob URL for the photo preview; lives in memory only, gone on refresh
+let asking = "";        // the "tell us what to change" text on the draft screen
+let photoURL = null;    // blob URL for the photo preview; lives in memory only, gone on refresh
 
 // Credit to the D2 team for keeping the session in the browser tab, which follows the sessionStorage recovery in d2-team/frontend/app.js.
 // It survives a refresh, it is gone when the tab closes, and nothing is kept on the server.
+// draft_before is the draft as it was just before the last AI rewrite, so the changes can be highlighted.
 function blank() {
-  return { step: "intro", path: "guide", draft: null, self_draft: { title: "", post: "" }, privacy: "",
-    answers: { what_happened: "", what_next: "", help: [], help_other: "", update_frequency: "", reach_out: [] } };
+  return { step: "intro", path: "guide", draft: null, draft_before: null, self_draft: null, privacy: "",
+    answers: { what_happened: "", what_next: "", help: [] } };
 }
 
 function load() {
@@ -81,7 +81,7 @@ function startOver() {
   if (!confirm("Start over? Your answers and draft will be cleared.")) return;
   if (photoURL) { URL.revokeObjectURL(photoURL); photoURL = null; }
   state = blank();
-  tweaks = TWEAKS_START();
+  asking = "";
   go("intro");
 }
 
@@ -104,31 +104,32 @@ const links = (left, right) => h("div", { class: "links" },
   h("button", { type: "button", class: "link", onclick: left[1] }, left[0]),
   right ? h("button", { type: "button", class: "link", onclick: right[1] }, right[0]) : null);
 
-const SIDE_STEPS = [
-  ["Create a new CaringBridge", "Who the CaringBridge is for"],
-  ["Write your first post", "Share an update with family & friends"],
-  ["Upload a photo", "Personalize by adding a photo"],
-  ["Privacy settings", "Decide who can interact with your CaringBridge"],
-];
+// The steps in the plum panel on the right: the questions, then the draft.
+// Someone writing it themselves has just the one step.
+function sideSteps() {
+  if (state.path === "blank") return [["write", "Write your post"]];
+  return [...flow.questions.map(q => [q.id, q.step_label]), ["draft", "Review your draft"]];
+}
 
-function currentSideStep() {
-  if (state.step === "photo") return 2;
-  if (state.step === "privacy") return 3;
-  return 1;
+// Which side step is current: -1 before the first one (the intro), and past the end once the post is written (photo and privacy).
+function currentSideStep(steps) {
+  if (state.step === "photo" || state.step === "privacy") return steps.length;
+  return steps.findIndex(([id]) => id === state.step);
 }
 
 function wizard(...content) {
-  const sideStep = currentSideStep();
+  const steps = sideSteps();
+  const here = currentSideStep(steps);
   return h("div", { class: "wizard" },
     h("section", { class: "wizard-main" },
       h("img", { class: "mobile-logo", src: "assets/logo-horizontal.svg", alt: "CaringBridge" }),
       h("div", { class: "step-box" }, ...content),
-      h("div", { class: "progress" }, [0, 1, 2, 3].map(i => h("span", { class: i === sideStep ? "on" : "" })))),
+      h("div", { class: "progress" }, steps.map((_, i) => h("span", { class: i <= here ? "on" : "" })))),
     h("aside", { class: "wizard-side" },
       h("img", { class: "side-logo", src: "assets/logo-stacked-white.svg", alt: "CaringBridge" }),
-      h("ol", { class: "steps" }, SIDE_STEPS.map(([title, text], i) =>
-        h("li", { class: i < sideStep ? "done" : i === sideStep ? "current" : "" },
-          h("small", {}, "Step " + (i + 1)), h("b", {}, title), text)))));
+      h("ol", { class: "steps" }, steps.map(([, label], i) =>
+        h("li", { class: i < here ? "done" : i === here ? "current" : "" },
+          h("small", {}, "Step " + (i + 1)), h("b", {}, label))))));
 }
 
 // The first screen
@@ -142,13 +143,14 @@ function introScreen() {
     if (state.path === "blank") return go("write");
     go(flow.questions[0].id);
   };
+  // The "how it works" note is plain text above the choices, so it doesn't look like a third option.
   return wizard(
     heading("Write Your First Post"),
     h("p", { class: "lead" }, "You don't need the perfect words. Just start with what's on your mind."),
+    h("p", { class: "how" }, h("b", {}, "How the writing guide works: "),
+      "it helps turn what you share into a draft. You approve the final post, and set privacy settings."),
     card("guide", "Help Me Find the Words (Recommended)", "Answer a few quick questions, one at a time. Type or talk, whatever feels right. We'll take it from there, together."),
     card("blank", "I'd Like to Write It Myself", "Start with a blank post. We'll offer ideas at your request if you change your mind."),
-    h("div", { class: "info" }, h("div", {}, h("b", {}, "How the Writing Guide Works"),
-      "The guide helps turn what you share into a draft. You approve the final post, and set privacy settings.")),
     noticeBox(),
     primary("Next Step", next),
     links(["Previous", () => say("The earlier steps aren't part of this prototype yet.")],
@@ -158,7 +160,7 @@ function introScreen() {
 // Writing it yourself
 
 function selfWriteScreen() {
-  if (!state.self_draft) state.self_draft = { title: "", post: "" };
+  if (!state.self_draft) state.self_draft = { title: flow.default_title, post: "" };
   const self = state.self_draft;
   const titleInput = h("input", { class: "text", id: "self-title", type: "text",
     placeholder: "Give your post a title",
@@ -243,7 +245,7 @@ function privacyScreen() {
     links(["Previous", () => go("photo")], null));
 }
 
-// Questions 1 to 4
+// The questions
 
 function questionScreen() {
   const index = flow.questions.findIndex(q => q.id === state.step);
@@ -252,15 +254,14 @@ function questionScreen() {
   const before = index === 0 ? "intro" : flow.questions[index - 1].id;
   const onward = () => (last ? makeDraft() : go(flow.questions[index + 1].id));
   const skip = () => {
-    for (const id of [q.id, q.other_id, ...(q.fields || []).map(f => f.id)]) {
-      if (id in state.answers) state.answers[id] = Array.isArray(state.answers[id]) ? [] : "";
-    }
+    state.answers[q.id] = Array.isArray(state.answers[q.id]) ? [] : "";
     onward();
   };
 
-  const body = q.type === "voice" ? voiceBox(q) : q.type === "checkboxes" ? checkboxes(q) : choiceFields(q);
+  const body = q.type === "voice" ? voiceBox(q) : checkboxes(q);
   return wizard(
-    h("p", { class: "eyebrow" }, `Question ${index + 1} of ${flow.questions.length}`),
+    h("p", { class: "eyebrow" }, `Question ${index + 1} of ${flow.questions.length}`,
+      q.type === "voice" ? h("span", { class: "voice-tag" }, micIcon(), "Type or talk") : null),
     heading(q.title),
     q.prompt ? h("p", { class: "lead" }, q.prompt) : null,
     body,
@@ -269,31 +270,33 @@ function questionScreen() {
     links(["Previous", () => go(before)], ["Skip for now", skip]));
 }
 
+// A small microphone drawing. SVG needs its own namespace, so it can't go through h().
+function micIcon() {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  for (const [k, v] of Object.entries({ viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2",
+    "stroke-linecap": "round", "stroke-linejoin": "round", class: "mic-icon", "aria-hidden": "true" })) svg.setAttribute(k, v);
+  const shapes = [["rect", { x: 9, y: 2, width: 6, height: 12, rx: 3 }], ["path", { d: "M5 10v1a7 7 0 0 0 14 0v-1" }], ["path", { d: "M12 18v4M8 22h8" }]];
+  for (const [tag, attrs] of shapes) {
+    const shape = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) shape.setAttribute(k, v);
+    svg.append(shape);
+  }
+  return svg;
+}
+
 function voiceBox(q) {
-  const box = h("textarea", { class: "text", "aria-label": q.title, oninput: e => { state.answers[q.id] = e.target.value; save(); } }, state.answers[q.id]);
+  const box = h("textarea", { class: "text", "aria-label": q.title, placeholder: "Type here, or tap the microphone and talk.",
+    oninput: e => { state.answers[q.id] = e.target.value; save(); } }, state.answers[q.id]);
   const talking = recording && recording.id === q.id;
-  const label = busy === "transcribe" ? "Writing down what you said..." : talking ? "Listening... tap when you're done" : "Turn on speech to type instead";
-  const pill = h("button", { type: "button", class: "pill" + (talking ? " listening" : ""), disabled: busy !== "",
-    onclick: () => (talking ? recording.recorder.stop() : startRecording(q)) }, label);
-  return h("div", {}, box, pill);
+  const label = busy === "transcribe" ? "Writing down what you said..." : talking ? "Listening... tap when you're done" : "Tap to talk instead of typing";
+  const mic = h("button", { type: "button", class: "mic" + (talking ? " listening" : ""), disabled: busy !== "",
+    onclick: () => (talking ? recording.recorder.stop() : startRecording(q)) }, h("span", { class: "mic-badge" }, micIcon()), label);
+  return h("div", {}, box, mic);
 }
 
 function checkboxes(q) {
-  const other = h("input", { class: "text", type: "text", value: state.answers[q.other_id], oninput: e => { state.answers[q.other_id] = e.target.value; save(); } });
-  return h("div", {},
-    chips(q.options, state.answers[q.id], true, ids => { state.answers[q.id] = ids; save(); }),
-    h("label", { class: "other" }, q.other_prompt, other));
-}
-
-function choiceFields(q) {
-  return h("div", {}, q.fields.map(field => {
-    const current = state.answers[field.id];
-    return h("div", {}, h("p", { class: "field-title" }, field.prompt),
-      chips(field.options, field.multiple ? current : current ? [current] : [], field.multiple, ids => {
-        state.answers[field.id] = field.multiple ? ids : ids[0] || "";
-        save();
-      }));
-  }), q.note ? h("p", { class: "fine" }, q.note) : null);
+  return chips(q.options, state.answers[q.id], true, ids => { state.answers[q.id] = ids; save(); });
 }
 
 // The buttons change in place, so the keyboard focus stays where it was.
@@ -375,6 +378,7 @@ async function makeDraft() {
   render();
   try {
     state.draft = await post("/draft", answersForApi());
+    state.draft_before = null;  // a fresh draft has nothing to compare against
     go("draft");
   } catch (err) {
     notice = err.message;
@@ -383,14 +387,18 @@ async function makeDraft() {
   render();
 }
 
-// One call carries the sliders and the text box together, along with the draft as the author has edited it.
+// One call carries what the author asked for, along with the draft as they have edited it.
+// The draft as it was just before is kept, so the screen can highlight what the AI changed.
 async function rewrite() {
+  if (!asking.trim()) return;
   busy = "rewrite";
   notice = "";
   render();
   try {
-    state.draft = await post("/regenerate", { answers: answersForApi(), draft: { title: state.draft.title, post: state.draft.post }, adjustments: tweaks });
-    tweaks = TWEAKS_START();
+    const before = { title: state.draft.title, post: state.draft.post };
+    state.draft = await post("/regenerate", { answers: answersForApi(), draft: before, adjustments: { extra: asking } });
+    state.draft_before = before;
+    asking = "";
     save();
   } catch (err) {
     notice = err.message;
@@ -399,63 +407,98 @@ async function rewrite() {
   render();
 }
 
-const slidersMoved = () => flow.sliders.some(s => tweaks[s.id] !== flow.slider_default);
+// Which words in `after` are new compared with `before`.
+// Returns the pieces of `after` in order, each marked changed or not.
+// It's a word-level longest-common-subsequence, which is plenty fast for a post.
+function wordChanges(before, after) {
+  const pieces = after.match(/\S+|\s+/g) || [];
+  const words = pieces.filter(p => /\S/.test(p));
+  const old = (before.match(/\S+/g) || []);
+  const n = words.length, m = old.length;
+  if (n * m > 4000000) return pieces.map(text => ({ text, changed: false }));  // too long to compare, so skip the highlight
 
-function refreshButtons() {
-  document.getElementById("suggest").disabled = busy !== "" || !slidersMoved();
-  document.getElementById("ask").disabled = busy !== "" || !tweaks.extra.trim();
+  // lcs[i][j] is the longest run shared by words[i..] and old[j..], kept in one flat array.
+  const lcs = new Uint32Array((n + 1) * (m + 1));
+  const at = (i, j) => i * (m + 1) + j;
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lcs[at(i, j)] = words[i] === old[j] ? lcs[at(i + 1, j + 1)] + 1 : Math.max(lcs[at(i + 1, j)], lcs[at(i, j + 1)]);
+    }
+  }
+  const kept = new Array(n).fill(false);
+  for (let i = 0, j = 0; i < n && j < m;) {
+    if (words[i] === old[j]) { kept[i] = true; i++; j++; }
+    else if (lcs[at(i + 1, j)] >= lcs[at(i, j + 1)]) i++;
+    else j++;
+  }
+
+  // Spaces between two changed words are part of the change, so the highlight reads as one stretch.
+  let w = 0;
+  const marked = pieces.map(text => /\S/.test(text) ? { text, changed: !kept[w++] } : { text, changed: false, space: true });
+  marked.forEach((piece, i) => {
+    if (piece.space && !piece.text.includes("\n") && marked[i - 1] && marked[i - 1].changed && marked[i + 1] && marked[i + 1].changed) piece.changed = true;
+  });
+  return marked;
 }
 
-function slider(def) {
-  const word = h("span", { class: "slider-word" }, def.labels[tweaks[def.id] - 1]);
-  const input = h("input", { type: "range", min: 1, max: 5, step: 1, value: tweaks[def.id], "aria-label": def.title,
-    oninput: e => { tweaks[def.id] = Number(e.target.value); word.textContent = def.labels[tweaks[def.id] - 1]; refreshButtons(); } });
-  return h("div", { class: "slider" }, h("div", { class: "slider-head" }, h("span", {}, def.title), word), input,
-    h("div", { class: "slider-ends" }, h("span", {}, def.low), h("span", {}, def.high)));
+// The highlight sits behind a see-through textarea, lined up word for word, so the post stays editable.
+function paintChanges(backdrop, text) {
+  const before = state.draft_before;
+  const pieces = before ? wordChanges(before.post, text) : [{ text, changed: false }];
+  backdrop.replaceChildren(...pieces.map(p => (p.changed ? h("mark", {}, p.text) : p.text)), "\n");
 }
 
-function includes() {
-  const a = state.answers;
-  return [
-    ["Who is writing", Boolean(PROFILE.author_name)],
-    ["What happened", Boolean(a.what_happened.trim())],
-    ["What's next", Boolean(a.what_next.trim())],
-    ["How people can help", a.help.length > 0 || Boolean(a.help_other.trim())],
-    ["When to expect updates", Boolean(a.update_frequency)],
-    ["A thank you (optional)", state.draft.post.toLowerCase().includes("thank")],
-  ];
+// The post box grows to fit its text, so it never scrolls and the highlight never drifts.
+function growPost() {
+  const box = document.getElementById("post");
+  if (!box) return;
+  box.style.height = "auto";
+  box.style.height = box.scrollHeight + "px";
+}
+window.addEventListener("resize", growPost);
+
+function clearHighlights() {
+  state.draft_before = null;
+  save();
+  render();
 }
 
 function draftScreen() {
   const draft = state.draft;
-  const title = h("input", { class: "text", id: "title", type: "text", value: draft.title, oninput: e => { draft.title = e.target.value; save(); } });
-  const text = h("textarea", { class: "text post", id: "post", oninput: e => { draft.post = e.target.value; save(); } }, draft.post);
-  const asking = h("textarea", { class: "text", placeholder: "e.g., add a thank you to the nurses", "aria-label": "Tell us what to change",
-    oninput: e => { tweaks.extra = e.target.value; refreshButtons(); } }, tweaks.extra);
+  const before = state.draft_before;
+  const titleChanged = () => Boolean(before) && before.title !== draft.title;
 
-  const main = h("div", {},
+  const title = h("input", { class: "text" + (titleChanged() ? " changed" : ""), id: "title", type: "text", value: draft.title,
+    oninput: e => { draft.title = e.target.value; e.target.classList.toggle("changed", titleChanged()); save(); } });
+  const backdrop = h("div", { class: "post-backdrop", "aria-hidden": "true" });
+  const text = h("textarea", { class: "text post", id: "post",
+    oninput: e => { draft.post = e.target.value; paintChanges(backdrop, draft.post); growPost(); save(); } }, draft.post);
+  paintChanges(backdrop, draft.post);
+
+  const askBox = h("textarea", { class: "text", id: "ask-text", placeholder: "e.g., make it shorter, or add a thank you to the nurses",
+    oninput: e => { asking = e.target.value; askButton.disabled = busy !== "" || !asking.trim(); } }, asking);
+  const askButton = h("button", { type: "button", class: "secondary", onclick: rewrite, disabled: busy !== "" || !asking.trim() },
+    busy === "rewrite" ? "Working on it..." : "Make these changes");
+
+  const screen = h("div", { class: "draft" },
     h("p", { class: "eyebrow" }, "Step 2 of 4 · Your draft"),
     heading("Here's a First Draft, in Your Words"),
     h("p", { class: "banner" }, "We kept your words and smoothed out the rough spots. Change anything you like."),
     h("label", { for: "title" }, "Title"), title,
-    h("label", { for: "post" }, "Post"), text,
+    h("label", { for: "post" }, "Post"),
+    h("div", { class: "post-wrap" }, backdrop, text),
+    before ? h("p", { class: "changes-note" }, h("mark", {}, "Highlighted"), " text is what we just changed. ",
+      h("button", { type: "button", class: "link", onclick: clearHighlights }, "Hide highlights")) : null,
     draft.privacy_flags.length ? h("p", { class: "notice" }, "Heads up, this looks like contact details: " + draft.privacy_flags.map(f => f.text).join(", ") + ". You decide what stays in.") : null,
+    h("div", { class: "ask" },
+      h("label", { for: "ask-text" }, "Want us to change anything?"),
+      h("p", { class: "fine" }, "Tell us in your own words. Nothing changes until you ask, and you can still edit by hand."),
+      askBox, askButton),
     h("p", { class: "fine" }, flow.ai_notice),
     noticeBox(),
     primary("Next Step", () => go("photo")),
     links(["Back to answers", () => go(flow.questions[0].id)], ["Start over", startOver]));
-
-  const feel = h("div", { class: "panel" }, h("h2", {}, "Make It Feel Right"), h("p", { class: "fine" }, "Nothing changes until you say so."),
-    flow.sliders.map(slider),
-    primary(busy === "rewrite" ? "Working on it..." : "Suggest Changes", rewrite, true));
-  feel.querySelector(".primary").id = "suggest";
-  const ask = h("div", { class: "panel" }, h("h2", {}, "Or tell us what to change"), asking, primary("Ask", rewrite, true));
-  ask.querySelector(".primary").id = "ask";
-  const list = h("div", { class: "panel" }, h("h2", {}, "Your Post Includes"),
-    h("ul", { class: "checks" }, includes().map(([label, yes]) => h("li", { class: yes ? "yes" : "no" }, label))));
-
-  const screen = h("div", { class: "draft" }, main, h("aside", {}, feel, ask, list));
-  queueMicrotask(refreshButtons);  // sets the two buttons once they are on the page
+  queueMicrotask(growPost);  // sizes the post box once it is on the page
   return screen;
 }
 
@@ -464,6 +507,10 @@ async function start() {
   catch (err) { document.getElementById("app").textContent = err.message; return; }
   const known = ["intro", "draft", "write", "photo", "privacy", ...flow.questions.map(q => q.id)];
   if (!known.includes(state.step) || (state.step === "draft" && !state.draft)) state.step = "intro";
+  // A tab opened before the questions changed may still hold answers or options that no longer exist.
+  const helpIds = (flow.questions.find(q => q.id === "help") || { options: [] }).options.map(o => o.id);
+  state.answers = { what_happened: state.answers.what_happened || "", what_next: state.answers.what_next || "",
+    help: (state.answers.help || []).filter(id => helpIds.includes(id)) };
   render();
 }
 

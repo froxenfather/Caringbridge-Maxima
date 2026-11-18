@@ -5,25 +5,17 @@ from conftest import ANSWERS
 
 
 def test_answers_are_tidied():
-    tidy = writer.validate_answers({"what_happened": "  Mom fell.  ", "help": ["prayers", "meals", "meals"]})
+    tidy = writer.validate_answers({"what_happened": "  Mom fell.  ", "help": ["prayers", "rides", "rides"]})
     assert tidy["what_happened"] == "Mom fell."
-    assert tidy["help"] == ["meals", "prayers"]  # menu order, no repeats
-    assert tidy["reach_out"] == []
+    assert tidy["help"] == ["rides", "prayers"]  # menu order, no repeats
     assert tidy["profile"] == {"author_name": "", "page_for": "", "relationship": ""}
-
-
-def test_reaching_out_can_pick_several_in_menu_order():
-    tidy = writer.validate_answers({"what_happened": "x", "reach_out": ["candle", "comments", "candle"]})
-    assert tidy["reach_out"] == ["comments", "candle"]
 
 
 def test_bad_answers_are_refused():
     with pytest.raises(ValueError, match="know"):
         writer.validate_answers({"help": ["unicorns"]})
     with pytest.raises(ValueError, match="know"):
-        writer.validate_answers({"what_happened": "x", "reach_out": ["carrier_pigeon"]})
-    with pytest.raises(ValueError, match="know"):
-        writer.validate_answers({"what_happened": "x", "update_frequency": "hourly"})
+        writer.validate_answers({"help": ["meals"]})  # meals and money are no longer offered
     with pytest.raises(ValueError, match="too long"):
         writer.validate_answers({"what_happened": "x", "profile": {"author_name": "S" * 101}})
     with pytest.raises(ValueError, match="too long"):
@@ -48,9 +40,9 @@ def test_the_middle_slider_position_says_nothing():
 
 def test_first_prompt_has_every_answer_and_no_rewrite_sections():
     prompt = writer.build_prompt(writer.validate_answers(ANSWERS))
-    for expected in ["Mom fell last week", "Surgery is on Thursday", "Meals, Prayers", "tulips", "Updates: About once a week",
-                     "People can reach out by: Comments and Reactions on the page, Light a candle on the page"]:
+    for expected in ["Mom fell last week", "Surgery is on Thursday", "Rides, Prayers"]:
         assert expected in prompt
+    assert "STAYING IN TOUCH" not in prompt
     assert "CURRENT DRAFT" not in prompt
 
 
@@ -63,10 +55,11 @@ def test_the_stand_in_profile_reaches_the_prompt_and_missing_profile_says_so():
 
 def test_the_flow_matches_what_the_front_end_needs():
     from backend import flow
-    assert [q["id"] for q in flow.QUESTIONS] == ["what_happened", "what_next", "help", "staying_in_touch"]
-    assert [o["id"] for o in flow.HELP_OPTIONS][-2:] == ["pet_care", "fundraising"]
-    fields = {f["id"]: f for f in flow.QUESTIONS[3]["fields"]}
-    assert fields["update_frequency"]["multiple"] is False and fields["reach_out"]["multiple"] is True
+    assert [q["id"] for q in flow.QUESTIONS] == ["what_happened", "what_next", "help"]
+    ids = [o["id"] for o in flow.HELP_OPTIONS]
+    assert not {"meals", "gift_cards", "fundraising"} & set(ids)
+    assert "other_id" not in flow.QUESTIONS[2]  # no free-text box on the help question
+    assert flow.DEFAULT_TITLE == "Today's Update"
     for slider in flow.SLIDERS:
         assert len(slider["labels"]) == 5 and slider["labels"][2] == "As it is"
 
@@ -74,7 +67,7 @@ def test_the_flow_matches_what_the_front_end_needs():
 def test_unanswered_sections_say_so_instead_of_being_left_for_the_ai_to_fill():
     prompt = writer.build_prompt(writer.validate_answers({"what_happened": "Mom fell."}))
     assert "WHAT HAPPENS NEXT (author's own words):\n(not provided)" in prompt
-    assert "STAYING IN TOUCH:\n(not provided)" in prompt
+    assert "HOW OTHERS CAN HELP (author ticked):\n(not provided)" in prompt
 
 
 def test_rewrite_prompt_adds_draft_sliders_and_instruction():
@@ -103,13 +96,14 @@ def test_contact_details_are_flagged():
 
 def test_first_draft_makes_one_call(fake_ai):
     draft = writer.first_draft(ANSWERS)
-    assert draft == {"title": "A new chapter", "post": "We got news this week.", "privacy_flags": []}
+    # The title always starts as "Today's Update", whatever the AI suggests.
+    assert draft == {"title": "Today's Update", "post": "We got news this week.", "privacy_flags": []}
     assert len(fake_ai.calls) == 1
     assert "never invent" in fake_ai.calls[0]["system"].lower()
 
 
 def test_regenerate_makes_exactly_one_call_and_carries_the_edits(fake_ai):
-    writer.regenerate(ANSWERS, {"title": "T", "post": "My own edit."}, {"tone": 5, "extra": "keep it short"})
+    writer.regenerate(ANSWERS, {"title": "T", "post": "My own edit."}, {"extra": "keep it short"})
     assert len(fake_ai.calls) == 1
     assert "My own edit." in fake_ai.calls[0]["user"] and "keep it short" in fake_ai.calls[0]["user"]
 
