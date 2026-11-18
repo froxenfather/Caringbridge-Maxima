@@ -116,9 +116,9 @@ def sent_body(monkeypatch, model):
     return seen
 
 
-def test_thinking_models_get_a_big_budget_and_light_thinking(monkeypatch):
+def test_thinking_models_get_a_big_budget_and_medium_thinking(monkeypatch):
     body = sent_body(monkeypatch, "openai/gpt-oss-20b")
-    assert body["max_tokens"] == 4000 and body["reasoning_effort"] == "low"
+    assert body["max_tokens"] == 4000 and body["reasoning_effort"] == "medium"
 
 
 def test_other_models_are_not_sent_a_thinking_setting_they_might_reject(monkeypatch):

@@ -51,10 +51,10 @@ def call_ai(system, user):
             {"role": "user", "content": user},
         ],
     }
-    # The gpt-oss models think before they answer, and a long think can use up the whole budget and leave no answer at all.
-    # Keeping the thinking light also makes the reply faster and uses less of Groq's per-minute limit.
+    # The gpt-oss models think before they answer, and a long think can use up the whole budget and leave no answer at all, so they get a big one.
+    # Thinking too little made the sliders do almost nothing, so the default is medium.
     if "gpt-oss" in model:
-        body["reasoning_effort"] = setting("AI_REASONING_EFFORT", "low")
+        body["reasoning_effort"] = setting("AI_REASONING_EFFORT", "medium")
     try:
         reply = requests.post(base_url() + "/chat/completions", json=body, headers=auth_headers(), timeout=60)
         reply.raise_for_status()

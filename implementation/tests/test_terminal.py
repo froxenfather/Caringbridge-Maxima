@@ -61,6 +61,7 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
         "a", "1", "", "5", "mention the tulips",   # adjust: shorter, tone left alone, own words, extra instruction
         "s",                             # save
     ])
+    fake_ai.replies = [fake_ai.reply, '{"title": "A new chapter", "post": "We got some good news this week."}']  # the rewrite really changes
     assert cli.main(["--text", "--out", str(tmp_path)]) == 0
 
     assert len(fake_ai.calls) == 2  # one for the draft, one for the rewrite, nothing else
@@ -71,7 +72,7 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
 
     saved = list(tmp_path.glob("caringbridge_post_*.txt"))
     assert len(saved) == 1
-    assert saved[0].read_text(encoding="utf-8") == "A new chapter\n\nWe got news this week.\n"
+    assert saved[0].read_text(encoding="utf-8") == "A new chapter\n\nWe got some good news this week.\n"
     out = capsys.readouterr().out
     assert "Nothing has been posted" in out and flow.AI_NOTICE in out
 
