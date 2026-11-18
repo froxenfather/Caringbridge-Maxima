@@ -34,7 +34,7 @@ def test_sliders_default_to_the_middle_and_are_checked():
 
 def test_the_middle_slider_position_says_nothing():
     assert writer.slider_text("tone", 3) == ""
-    assert "shorter" in writer.slider_text("length", 1)
+    assert "half" in writer.slider_text("length", 1)
     assert "own" in writer.slider_text("wording", 5)
 
 
@@ -112,3 +112,103 @@ def test_regenerate_needs_a_draft(fake_ai):
     with pytest.raises(ValueError, match="no draft"):
         writer.regenerate(ANSWERS, {"title": "", "post": " "}, {})
     assert fake_ai.calls == []
+
+
+def test_a_line_break_inside_the_models_json_is_fine():
+    reply = '{"title": "Update", "post": "First line.\nSecond line."}'
+    assert writer.parse_post(reply) == ("Update", "First line.\nSecond line.")
+
+
+def test_a_missing_or_null_title_is_just_empty():
+    assert writer.parse_post('{"post": "Body."}') == ("", "Body.")
+    assert writer.parse_post('{"title": null, "post": "Body."}') == ("", "Body.")
+
+
+def test_a_rewrite_will_not_accept_plain_text_in_place_of_the_draft():
+    refusal = "I'm sorry, but I can't help with that."
+    assert writer.parse_post(refusal) == ("", refusal)  # a first draft keeps it
+    assert writer.parse_post(refusal, need_json=True) == ("", "")  # a rewrite does not
+
+
+def test_an_empty_reply_is_tried_again_and_then_used(fake_ai):
+    fake_ai.replies = ["", '{"title": "Second try", "post": "It worked."}']
+    draft = writer.first_draft(ANSWERS)
+    assert draft["title"] == "Today's Update" and draft["post"] == "It worked."  # a first draft always starts with the standard title
+    assert len(fake_ai.calls) == 2
+
+
+def test_replies_that_stay_empty_are_an_error_and_never_a_blank_draft(fake_ai):
+    from backend import ai
+    fake_ai.reply = ""
+    with pytest.raises(ai.AIError, match="usable draft"):
+        writer.first_draft(ANSWERS)
+    assert len(fake_ai.calls) == 2
+
+
+def test_an_empty_json_post_counts_as_empty(fake_ai):
+    from backend import ai
+    fake_ai.reply = '{"title": "", "post": ""}'
+    with pytest.raises(ai.AIError):
+        writer.regenerate(ANSWERS, {"title": "Mine", "post": "My words."}, {"tone": 5})
+
+
+def test_a_rewrite_that_forgets_the_title_keeps_the_authors(fake_ai):
+    fake_ai.reply = '{"post": "A new body."}'
+    result = writer.regenerate(ANSWERS, {"title": "My own title", "post": "Old body."}, {"tone": 5})
+    assert result["title"] == "My own title" and result["post"] == "A new body."
+
+
+def test_a_rewrite_rejects_a_plain_text_reply_instead_of_replacing_the_draft(fake_ai):
+    from backend import ai
+    fake_ai.reply = "I'm sorry, but I can't help with that."
+    with pytest.raises(ai.AIError):
+        writer.regenerate(ANSWERS, {"title": "Mine", "post": "My words."}, {"extra": "anything"})
+
+
+def test_every_slider_position_gives_the_ai_a_concrete_instruction():
+    for name, words in writer.SLIDER_WORDS.items():
+        assert sorted(words) == [1, 2, 4, 5]
+        assert all(text.lower().startswith(name) for text in words.values())
+
+
+def test_the_sliders_never_change_the_authors_title(fake_ai):
+    fake_ai.reply = '{"title": "Something the AI made up", "post": "A new body."}'
+    result = writer.regenerate(ANSWERS, {"title": "My own title", "post": "Old body."}, {"tone": 5})
+    assert result["title"] == "My own title" and result["post"] == "A new body."
+
+
+def test_the_authors_own_instruction_can_change_the_title(fake_ai):
+    fake_ai.reply = '{"title": "A shorter title", "post": "A new body."}'
+    result = writer.regenerate(ANSWERS, {"title": "My own very long title", "post": "Old body."}, {"extra": "make the title shorter"})
+    assert result["title"] == "A shorter title"
+
+
+def test_the_rules_ask_for_paragraph_breaks_the_json_can_carry():
+    assert "\n\n" in writer.SYSTEM_RULES  # the two characters backslash and n, which is how JSON writes a line break
+
+
+def test_a_rewrite_that_comes_back_unchanged_is_asked_for_again(fake_ai):
+    same = '{"title": "T", "post": "Old body."}'
+    better = '{"title": "T", "post": "A warmer body."}'
+    fake_ai.replies = [same, better]
+    result = writer.regenerate(ANSWERS, {"title": "T", "post": "Old body."}, {"tone": 5})
+    assert result["post"] == "A warmer body."
+    assert len(fake_ai.calls) == 2 and "identical to the CURRENT DRAFT" in fake_ai.calls[1]["user"]
+
+
+def test_nothing_is_asked_again_when_the_author_asked_for_nothing(fake_ai):
+    fake_ai.reply = '{"title": "T", "post": "Old body."}'
+    result = writer.regenerate(ANSWERS, {"title": "T", "post": "Old body."}, {})
+    assert result["post"] == "Old body." and len(fake_ai.calls) == 1
+
+
+def test_if_it_is_still_unchanged_after_asking_again_the_author_gets_it_back_and_is_told_by_the_page(fake_ai):
+    fake_ai.reply = '{"title": "T", "post": "Old body."}'
+    result = writer.regenerate(ANSWERS, {"title": "T", "post": "Old body."}, {"tone": 5})
+    assert result["post"] == "Old body." and len(fake_ai.calls) == 2
+
+
+def test_an_instruction_that_is_not_about_the_title_leaves_the_title_alone(fake_ai):
+    fake_ai.reply = '{"title": "A title the AI made up", "post": "A new body."}'
+    result = writer.regenerate(ANSWERS, {"title": "Today's Update", "post": "Old body."}, {"extra": "add a thank you to the nurses"})
+    assert result["title"] == "Today's Update" and result["post"] == "A new body."

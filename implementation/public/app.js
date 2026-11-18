@@ -391,15 +391,19 @@ async function makeDraft() {
 // The draft as it was just before is kept, so the screen can highlight what the AI changed.
 async function rewrite() {
   if (!asking.trim()) return;
+  if (!state.draft.post.trim()) return say("There's nothing in the post to rewrite yet. Type something, or go back to your answers.");
   busy = "rewrite";
   notice = "";
   render();
   try {
     const before = { title: state.draft.title, post: state.draft.post };
-    state.draft = await post("/regenerate", { answers: answersForApi(), draft: before, adjustments: { extra: asking } });
+    const result = await post("/regenerate", { answers: answersForApi(), draft: before, adjustments: { extra: asking } });
+    const same = result.post.trim() === before.post.trim();
+    state.draft = { ...result, title: result.title || before.title };  // a rewrite never swaps the title for nothing
     state.draft_before = before;
     asking = "";
     save();
+    if (same) notice = "That came back the same as before. Try a bigger change, or tell us in your own words what to change.";
   } catch (err) {
     notice = err.message;
   }

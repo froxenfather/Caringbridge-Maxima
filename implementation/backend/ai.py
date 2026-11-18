@@ -10,7 +10,12 @@ log = logging.getLogger("backend.ai")
 
 class AIError(Exception):
     """Something went wrong talking to the AI.
-    The message is safe to show a person."""
+    The message is safe to show a person.
+    busy is True when the service is only asking us to slow down, so the person can be told to wait a moment."""
+
+    def __init__(self, message, busy=False):
+        super().__init__(message)
+        self.busy = busy
 
 
 def base_url():
@@ -36,21 +41,32 @@ def auth_headers():
 def call_ai(system, user):
     """Send one prompt, get the model's reply as text.
     This is the only place a model is called, so switching providers (Bedrock, for example) means replacing just this function."""
+    model = setting("AI_MODEL", "openai/gpt-oss-20b")
     body = {
-        "model": setting("AI_MODEL", "openai/gpt-oss-20b"),
+        "model": model,
         "temperature": 0.4,
+        "max_tokens": 4000,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     }
+    # The gpt-oss models think before they answer, and a long think can use up the whole budget and leave no answer at all, so they get a big one.
+    # Thinking too little made the sliders do almost nothing, so the default is medium.
+    if "gpt-oss" in model:
+        body["reasoning_effort"] = setting("AI_REASONING_EFFORT", "medium")
     try:
         reply = requests.post(base_url() + "/chat/completions", json=body, headers=auth_headers(), timeout=60)
         reply.raise_for_status()
-        text = reply.json()["choices"][0]["message"]["content"]
+        choice = reply.json()["choices"][0]
+        text = choice["message"]["content"]
+        if not (text or "").strip():
+            log.warning("The AI sent back no text (finish_reason=%s)", choice.get("finish_reason"))
     except requests.HTTPError as err:
         status = err.response.status_code
         log.warning("AI request failed with HTTP %s", status)
+        if status == 429:
+            raise AIError("The writing helper is busy right now. Please wait a minute and try again.", busy=True) from err
         raise AIError("The AI service turned the request down (HTTP %s). Check AI_API_KEY and AI_MODEL." % status) from err
     except (requests.RequestException, KeyError, IndexError, ValueError) as err:
         log.warning("AI request failed: %s", type(err).__name__)
