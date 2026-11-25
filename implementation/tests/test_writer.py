@@ -5,9 +5,9 @@ from conftest import ANSWERS
 
 
 def test_answers_are_tidied():
-    tidy = writer.validate_answers({"what_happened": "  Mom fell.  ", "help": ["prayers", "rides", "rides"]})
+    tidy = writer.validate_answers({"what_happened": "  Mom fell.  ", "help": ["meals", "errands", "errands"]})
     assert tidy["what_happened"] == "Mom fell."
-    assert tidy["help"] == ["rides", "prayers"]  # menu order, no repeats
+    assert tidy["help"] == ["errands", "meals"]  # menu order, no repeats
     assert tidy["profile"] == {"author_name": "", "page_for": "", "relationship": ""}
 
 
@@ -15,7 +15,7 @@ def test_bad_answers_are_refused():
     with pytest.raises(ValueError, match="know"):
         writer.validate_answers({"help": ["unicorns"]})
     with pytest.raises(ValueError, match="know"):
-        writer.validate_answers({"help": ["meals"]})  # meals and money are no longer offered
+        writer.validate_answers({"help": ["gift_cards"]})  # money requests are not offered
     with pytest.raises(ValueError, match="too long"):
         writer.validate_answers({"what_happened": "x", "profile": {"author_name": "S" * 101}})
     with pytest.raises(ValueError, match="too long"):
@@ -40,7 +40,7 @@ def test_the_middle_slider_position_says_nothing():
 
 def test_first_prompt_has_every_answer_and_no_rewrite_sections():
     prompt = writer.build_prompt(writer.validate_answers(ANSWERS))
-    for expected in ["Mom fell last week", "Surgery is on Thursday", "Rides, Prayers"]:
+    for expected in ["Mom fell last week", "Surgery is on Thursday", "Errands, Meals"]:
         assert expected in prompt
     assert "STAYING IN TOUCH" not in prompt
     assert "CURRENT DRAFT" not in prompt
@@ -57,7 +57,7 @@ def test_the_flow_matches_what_the_front_end_needs():
     from backend import flow
     assert [q["id"] for q in flow.QUESTIONS] == ["what_happened", "what_next", "help"]
     ids = [o["id"] for o in flow.HELP_OPTIONS]
-    assert not {"meals", "gift_cards", "fundraising"} & set(ids)
+    assert ids == ["childcare", "chores", "errands", "meals", "petcare", "transportation", "visiting"]
     assert "other_id" not in flow.QUESTIONS[2]  # no free-text box on the help question
     assert flow.DEFAULT_TITLE == "Today's Update"
     for slider in flow.SLIDERS:

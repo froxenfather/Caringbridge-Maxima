@@ -39,9 +39,9 @@ def test_a_cough_is_not_an_answer():
 
 def test_checkbox_picks():
     options = flow.HELP_OPTIONS
-    assert cli.parse_picks("1, 3 5", options) == ["rides", "visits", "pet_care"]
+    assert cli.parse_picks("1, 3 5", options) == ["childcare", "errands", "petcare"]
     assert cli.parse_picks("", options) == []
-    assert cli.parse_picks("2 2", options) == ["prayers"]
+    assert cli.parse_picks("2 2", options) == ["chores"]
     assert cli.parse_picks("9", options) is None
     assert cli.parse_picks("rides", options) is None
 
@@ -55,7 +55,7 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
     type_in(monkeypatch, [
         "Mom fell and broke her hip.",   # question 1
         "Surgery is on Thursday.",       # question 2
-        "1,2",                           # question 3: rides, prayers
+        "3,4",                           # question 3: errands, meals
         "",                              # see your first draft
         "a", "1", "", "5", "mention the tulips",   # adjust: shorter, tone left alone, own words, extra instruction
         "s",                             # save
@@ -65,7 +65,7 @@ def test_whole_typed_flow_with_one_rewrite(monkeypatch, tmp_path, fake_ai, capsy
 
     assert len(fake_ai.calls) == 2  # one for the draft, one for the rewrite, nothing else
     first, rewrite = (c["user"] for c in fake_ai.calls)
-    assert "Rides, Prayers" in first and "CURRENT DRAFT" not in first
+    assert "Errands, Meals" in first and "CURRENT DRAFT" not in first
     assert "Title: Today's Update" in rewrite  # the first draft's title went into the rewrite
     assert "CURRENT DRAFT" in rewrite and "mention the tulips" in rewrite and "We got news this week." in rewrite
 

@@ -5,16 +5,20 @@
 
 AI_NOTICE = "This draft was written with AI, using your own words. You decide what gets posted."
 
+# The small line at the bottom of every screen where AI helps.
+AI_DISCLAIMER = "AI helps write this post from your answers. Please check it before you share it."
+
 DEFAULT_TITLE = "Today's Update"
 
-# Meals and money (meal trains, gift cards, fundraising) are left out on purpose.
-# CaringBridge has its own plans for how those will be offered.
+# These match CaringBridge's own Requests list, as the Product Leads asked.
 HELP_OPTIONS = [
-    {"id": "rides", "label": "Rides"},
-    {"id": "prayers", "label": "Prayers"},
-    {"id": "visits", "label": "Visits"},
-    {"id": "home_help", "label": "Help at home"},
-    {"id": "pet_care", "label": "Pet care"},
+    {"id": "childcare", "label": "Childcare"},
+    {"id": "chores", "label": "Chores"},
+    {"id": "errands", "label": "Errands"},
+    {"id": "meals", "label": "Meals"},
+    {"id": "petcare", "label": "Petcare"},
+    {"id": "transportation", "label": "Transportation"},
+    {"id": "visiting", "label": "Visiting"},
 ]
 
 QUESTIONS = [
@@ -37,7 +41,7 @@ QUESTIONS = [
         "step_label": "How others can help",
         "type": "checkboxes",
         "title": "How Can Others Help Right Now?",
-        "prompt": "People want to help. Pick anything that would make this week a little easier. You can change it anytime.",
+        "prompt": "People want to help, and they'll be glad to know how. Pick anything that would make this week a little easier, and we'll add a short, kind request for each one to your post. Leave them all blank if you'd rather not ask for anything yet.",
         "options": HELP_OPTIONS,
     },
 ]

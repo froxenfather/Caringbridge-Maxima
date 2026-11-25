@@ -10,13 +10,12 @@ let notice = "";        // a gentle message shown above the buttons
 let busy = "";          // what we're waiting on: "draft", "rewrite" or "transcribe"
 let recording = null;   // the microphone while someone is talking
 let asking = "";        // the "tell us what to change" text on the draft screen
-let photoURL = null;    // blob URL for the photo preview; lives in memory only, gone on refresh
 
 // Credit to the D2 team for keeping the session in the browser tab, which follows the sessionStorage recovery in d2-team/frontend/app.js.
 // It survives a refresh, it is gone when the tab closes, and nothing is kept on the server.
 // draft_before is the draft as it was just before the last AI rewrite, so the changes can be highlighted.
 function blank() {
-  return { step: "intro", path: "guide", draft: null, draft_before: null, self_draft: null, privacy: "",
+  return { step: "intro", path: "guide", draft: null, draft_before: null, self_draft: null,
     answers: { what_happened: "", what_next: "", help: [] } };
 }
 
@@ -79,7 +78,6 @@ function say(message) {
 
 function startOver() {
   if (!confirm("Start over? Your answers and draft will be cleared.")) return;
-  if (photoURL) { URL.revokeObjectURL(photoURL); photoURL = null; }
   state = blank();
   asking = "";
   go("intro");
@@ -89,8 +87,6 @@ function render() {
   const screen = state.step === "intro" ? introScreen()
     : state.step === "draft" ? draftScreen()
     : state.step === "write" ? selfWriteScreen()
-    : state.step === "photo" ? photoScreen()
-    : state.step === "privacy" ? privacyScreen()
     : questionScreen();
   document.getElementById("app").replaceChildren(screen);
 }
@@ -104,33 +100,46 @@ const links = (left, right) => h("div", { class: "links" },
   h("button", { type: "button", class: "link", onclick: left[1] }, left[0]),
   right ? h("button", { type: "button", class: "link", onclick: right[1] }, right[0]) : null);
 
-// The steps in the plum panel on the right: the questions, then the draft.
+// The steps in the berry panel on the right: the questions, then the draft.
 // Someone writing it themselves has just the one step.
 function sideSteps() {
   if (state.path === "blank") return [["write", "Write your post"]];
   return [...flow.questions.map(q => [q.id, q.step_label]), ["draft", "Review your draft"]];
 }
 
-// Which side step is current: -1 before the first one (the intro), and past the end once the post is written (photo and privacy).
-function currentSideStep(steps) {
-  if (state.step === "photo" || state.step === "privacy") return steps.length;
-  return steps.findIndex(([id]) => id === state.step);
+// The "Step 2 of 4" line, counted the same way as the berry panel.
+function stepOf(id) {
+  const steps = sideSteps();
+  return `Step ${steps.findIndex(([s]) => s === id) + 1} of ${steps.length}`;
+}
+
+// A finished step can be clicked to go back to it, and so can the draft once there is one.
+function sideStep([id, label], i, here) {
+  const current = i === here;
+  const canGo = !current && busy === "" && !recording && (i < here || (id === "draft" && state.draft));
+  const inner = [h("small", {}, "Step " + (i + 1)), h("b", {}, label)];
+  return h("li", { class: i < here ? "done" : current ? "current" : "", "aria-current": current ? "step" : null },
+    canGo ? h("button", { type: "button", class: "step-item", onclick: () => go(id) }, ...inner)
+      : h("span", { class: "step-item" }, ...inner));
 }
 
 function wizard(...content) {
   const steps = sideSteps();
-  const here = currentSideStep(steps);
-  return h("div", { class: "wizard" },
+  const here = steps.findIndex(([id]) => id === state.step);
+  const aiStep = state.path === "guide" && here >= 0;  // the questions and the draft
+  return h("div", { class: "wizard" + (state.step === "draft" ? " wide" : "") },
     h("section", { class: "wizard-main" },
       h("img", { class: "mobile-logo", src: "assets/logo-horizontal.svg", alt: "CaringBridge" }),
       h("div", { class: "step-box" }, ...content),
-      h("div", { class: "progress" }, steps.map((_, i) => h("span", { class: i <= here ? "on" : "" })))),
+      aiStep ? h("p", { class: "ai-disclaimer" }, h("span", { "aria-hidden": "true" }, "✦"), flow.ai_disclaimer) : null),
     h("aside", { class: "wizard-side" },
       h("img", { class: "side-logo", src: "assets/logo-stacked-white.svg", alt: "CaringBridge" }),
-      h("ol", { class: "steps" }, steps.map(([, label], i) =>
-        h("li", { class: i < here ? "done" : i === here ? "current" : "" },
-          h("small", {}, "Step " + (i + 1)), h("b", {}, label))))));
+      h("nav", { class: "side-steps", "aria-label": "Your steps" },
+        h("ol", { class: "steps" }, steps.map((step, i) => sideStep(step, i, here))))));
 }
+
+// Nothing is published from this prototype, so the last button on either path ends here.
+const finish = () => say("Your post is ready. Publishing isn't connected in this prototype yet.");
 
 // The first screen
 
@@ -143,12 +152,11 @@ function introScreen() {
     if (state.path === "blank") return go("write");
     go(flow.questions[0].id);
   };
-  // The "how it works" note is plain text above the choices, so it doesn't look like a third option.
   return wizard(
     heading("Write Your First Post"),
-    h("p", { class: "lead" }, "You don't need the perfect words. Just start with what's on your mind."),
-    h("p", { class: "how" }, h("b", {}, "How the writing guide works: "),
-      "it helps turn what you share into a draft. You approve the final post, and set privacy settings."),
+    h("p", { class: "lead intro-lead" }, "You don't need the perfect words to begin. Just start with what's on your mind. "
+      + "Our writing guide asks a few gentle questions and shapes your answers into a first draft that still sounds like you. "
+      + "You can change anything along the way, and nothing is shared until you're ready."),
     card("guide", "Help Me Find the Words (Recommended)", "Answer a few quick questions, one at a time. Type or talk, whatever feels right. We'll take it from there, together."),
     card("blank", "I'd Like to Write It Myself", "Start with a blank post. We'll offer ideas at your request if you change your mind."),
     noticeBox(),
@@ -173,76 +181,13 @@ function selfWriteScreen() {
     h("label", { for: "self-title" }, "Title"), titleInput,
     h("label", { for: "self-post" }, "Post"), postArea);
   return wizard(
-    h("p", { class: "eyebrow" }, "Step 2 of 4 · Write your post"),
+    h("p", { class: "eyebrow" }, "Your post"),
     heading("Write Your Post"),
     h("p", { class: "lead" }, "It's your story — write it your way."),
     fields,
     noticeBox(),
-    primary("Next Step", () => go("photo")),
+    primary("I'm Happy With This", finish),
     links(["Previous", () => go("intro")], ["Start over", startOver]));
-}
-
-// Photo upload
-
-function photoScreen() {
-  const fileInput = h("input", { type: "file", accept: "image/*", id: "photo-file",
-    onchange: e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (photoURL) URL.revokeObjectURL(photoURL);
-      photoURL = URL.createObjectURL(file);
-      render();
-    } });
-
-  const uploadArea = photoURL
-    ? h("div", { class: "photo-upload" },
-        h("img", { class: "photo-preview", src: photoURL, alt: "Your photo preview" }),
-        h("div", { class: "photo-actions" },
-          h("button", { type: "button", class: "link", onclick: () => fileInput.click() }, "Change photo"),
-          h("button", { type: "button", class: "link", onclick: () => { URL.revokeObjectURL(photoURL); photoURL = null; render(); } }, "Remove")),
-        fileInput)
-    : h("div", { class: "photo-upload" },
-        h("label", { for: "photo-file", class: "photo-drop" },
-          h("span", {}, "Choose a photo"),
-          h("span", { class: "photo-hint" }, "JPG, PNG or GIF")),
-        fileInput);
-
-  const back = state.path === "blank" ? "write" : "draft";
-  return wizard(
-    h("p", { class: "eyebrow" }, "Step 3 of 4 · Upload a photo"),
-    heading("Add a Photo"),
-    h("p", { class: "lead" }, "A photo helps visitors connect with your CaringBridge. You can add or change it later."),
-    uploadArea,
-    noticeBox(),
-    primary("Next Step", () => go("privacy")),
-    links(["Previous", () => go(back)], ["Skip for now", () => go("privacy")]));
-}
-
-// Privacy settings
-
-function privacyScreen() {
-  const options = [
-    { id: "public",   label: "Anyone with the link",    text: "Anyone who has the link to your page can read your posts." },
-    { id: "approval", label: "With your approval",      text: "Visitors can request access, and you decide who can read your posts." },
-    { id: "invite",   label: "By invite only",          text: "Only people you personally invite can read your posts." },
-  ];
-  const cards = options.map(opt =>
-    h("label", { class: "card" + (state.privacy === opt.id ? " selected" : "") },
-      h("input", { type: "radio", name: "privacy", checked: state.privacy === opt.id,
-        onchange: () => { state.privacy = opt.id; notice = ""; save(); render(); } }),
-      h("span", {}, h("strong", {}, opt.label), h("span", { class: "card-text" }, opt.text))));
-
-  return wizard(
-    h("p", { class: "eyebrow" }, "Step 4 of 4 · Privacy settings"),
-    heading("Who Can See Your Page?"),
-    h("p", { class: "lead" }, "You can change this any time from your page settings."),
-    ...cards,
-    noticeBox(),
-    primary("Publish Post", () => {
-      if (!state.privacy) return say("Please choose a privacy setting to continue.");
-      say("Your post is ready! Publishing isn't wired up in this prototype yet.");
-    }),
-    links(["Previous", () => go("photo")], null));
 }
 
 // The questions
@@ -260,7 +205,7 @@ function questionScreen() {
 
   const body = q.type === "voice" ? voiceBox(q) : checkboxes(q);
   return wizard(
-    h("p", { class: "eyebrow" }, `Question ${index + 1} of ${flow.questions.length}`,
+    h("p", { class: "eyebrow" }, stepOf(q.id),
       q.type === "voice" ? h("span", { class: "voice-tag" }, micIcon(), "Type or talk") : null),
     heading(q.title),
     q.prompt ? h("p", { class: "lead" }, q.prompt) : null,
@@ -295,20 +240,20 @@ function voiceBox(q) {
   return h("div", {}, box, mic);
 }
 
+// The help options are a plain checklist, one per line, kept in menu order.
+// Real checkboxes keep their own state, so nothing redraws and the keyboard focus stays put.
 function checkboxes(q) {
-  return chips(q.options, state.answers[q.id], true, ids => { state.answers[q.id] = ids; save(); });
-}
-
-// The buttons change in place, so the keyboard focus stays where it was.
-function chips(options, selected, multiple, onChange) {
-  let current = [...selected];
-  const buttons = options.map(option => h("button", { type: "button", class: "chip", "aria-pressed": String(current.includes(option.id)),
-    onclick: () => {
-      current = current.includes(option.id) ? current.filter(id => id !== option.id) : multiple ? [...current, option.id] : [option.id];
-      onChange(current);
-      buttons.forEach((button, i) => button.setAttribute("aria-pressed", String(current.includes(options[i].id))));
-    } }, option.label));
-  return h("div", { class: "chips" }, buttons);
+  const ids = q.options.map(o => o.id);
+  let current = [...state.answers[q.id]];
+  return h("fieldset", { class: "checklist" },
+    h("legend", { class: "sr-only" }, q.title),
+    q.options.map(option => h("label", { class: "check-row" },
+      h("input", { type: "checkbox", checked: current.includes(option.id), onchange: e => {
+        current = e.target.checked ? [...current, option.id] : current.filter(id => id !== option.id);
+        state.answers[q.id] = ids.filter(id => current.includes(id));
+        save();
+      } }),
+      h("span", {}, option.label))));
 }
 
 // Talking
@@ -411,15 +356,15 @@ async function rewrite() {
   render();
 }
 
-// Which words in `after` are new compared with `before`.
-// Returns the pieces of `after` in order, each marked changed or not.
+// Which words in `after` are new compared with `before`, and which words of `before` are gone.
+// `pieces` is `after` in order, each piece marked changed or not; `removed` is each run of words taken out.
 // It's a word-level longest-common-subsequence, which is plenty fast for a post.
 function wordChanges(before, after) {
   const pieces = after.match(/\S+|\s+/g) || [];
   const words = pieces.filter(p => /\S/.test(p));
   const old = (before.match(/\S+/g) || []);
   const n = words.length, m = old.length;
-  if (n * m > 4000000) return pieces.map(text => ({ text, changed: false }));  // too long to compare, so skip the highlight
+  if (n * m > 4000000) return { pieces: pieces.map(text => ({ text, changed: false })), removed: [] };  // too long to compare
 
   // lcs[i][j] is the longest run shared by words[i..] and old[j..], kept in one flat array.
   const lcs = new Uint32Array((n + 1) * (m + 1));
@@ -430,8 +375,9 @@ function wordChanges(before, after) {
     }
   }
   const kept = new Array(n).fill(false);
+  const oldKept = new Array(m).fill(false);
   for (let i = 0, j = 0; i < n && j < m;) {
-    if (words[i] === old[j]) { kept[i] = true; i++; j++; }
+    if (words[i] === old[j]) { kept[i] = true; oldKept[j] = true; i++; j++; }
     else if (lcs[at(i + 1, j)] >= lcs[at(i, j + 1)]) i++;
     else j++;
   }
@@ -442,14 +388,37 @@ function wordChanges(before, after) {
   marked.forEach((piece, i) => {
     if (piece.space && !piece.text.includes("\n") && marked[i - 1] && marked[i - 1].changed && marked[i + 1] && marked[i + 1].changed) piece.changed = true;
   });
-  return marked;
+
+  const removed = [];
+  let run = [];
+  old.forEach((word, j) => {
+    if (!oldKept[j]) run.push(word);
+    else if (run.length) { removed.push(run.join(" ")); run = []; }
+  });
+  if (run.length) removed.push(run.join(" "));
+  return { pieces: marked, removed };
+}
+
+// A removed stretch is shown in full unless it is long, so a dropped paragraph doesn't fill the screen.
+const REMOVED_WORDS_SHOWN = 30;
+const REMOVED_MIN_WORDS = 3;
+function shortened(text) {
+  const words = text.split(" ");
+  if (words.length <= REMOVED_WORDS_SHOWN) return text;
+  return words.slice(0, REMOVED_WORDS_SHOWN).join(" ") + ` … (${words.length - REMOVED_WORDS_SHOWN} more words)`;
 }
 
 // The highlight sits behind a see-through textarea, lined up word for word, so the post stays editable.
-function paintChanges(backdrop, text) {
+// Words that were taken out can't sit in the post itself, so they are listed under it, struck through.
+function paintChanges(backdrop, removedBox, text) {
   const before = state.draft_before;
-  const pieces = before ? wordChanges(before.post, text) : [{ text, changed: false }];
+  const { pieces, removed } = before ? wordChanges(before.post, text) : { pieces: [{ text, changed: false }], removed: [] };
   backdrop.replaceChildren(...pieces.map(p => (p.changed ? h("mark", {}, p.text) : p.text)), "\n");
+  // A word or two swapped out already shows as a highlight, so only longer stretches are listed.
+  const shown = removed.filter(r => r.split(" ").length >= REMOVED_MIN_WORDS);
+  removedBox.hidden = shown.length === 0;
+  removedBox.replaceChildren(h("p", { class: "removed-title" }, "Taken out"),
+    h("ul", {}, shown.map(r => h("li", {}, h("del", {}, shortened(r))))));
 }
 
 // The post box grows to fit its text, so it never scrolls and the highlight never drifts.
@@ -475,33 +444,34 @@ function draftScreen() {
   const title = h("input", { class: "text" + (titleChanged() ? " changed" : ""), id: "title", type: "text", value: draft.title,
     oninput: e => { draft.title = e.target.value; e.target.classList.toggle("changed", titleChanged()); save(); } });
   const backdrop = h("div", { class: "post-backdrop", "aria-hidden": "true" });
+  const removedBox = h("div", { class: "removed" });
   const text = h("textarea", { class: "text post", id: "post",
-    oninput: e => { draft.post = e.target.value; paintChanges(backdrop, draft.post); growPost(); save(); } }, draft.post);
-  paintChanges(backdrop, draft.post);
+    oninput: e => { draft.post = e.target.value; paintChanges(backdrop, removedBox, draft.post); growPost(); save(); } }, draft.post);
+  paintChanges(backdrop, removedBox, draft.post);
 
   const askBox = h("textarea", { class: "text", id: "ask-text", placeholder: "e.g., make it shorter, or add a thank you to the nurses",
     oninput: e => { asking = e.target.value; askButton.disabled = busy !== "" || !asking.trim(); } }, asking);
   const askButton = h("button", { type: "button", class: "secondary", onclick: rewrite, disabled: busy !== "" || !asking.trim() },
     busy === "rewrite" ? "Working on it..." : "Make these changes");
 
-  const screen = h("div", { class: "draft" },
-    h("p", { class: "eyebrow" }, "Step 2 of 4 · Your draft"),
+  const screen = wizard(h("div", { class: "draft" },
+    h("p", { class: "eyebrow" }, stepOf("draft") + " \u00b7 Your draft"),
     heading("Here's a First Draft, in Your Words"),
     h("p", { class: "banner" }, "We kept your words and smoothed out the rough spots. Change anything you like."),
     h("label", { for: "title" }, "Title"), title,
     h("label", { for: "post" }, "Post"),
     h("div", { class: "post-wrap" }, backdrop, text),
-    before ? h("p", { class: "changes-note" }, h("mark", {}, "Highlighted"), " text is what we just changed. ",
+    removedBox,
+    before ? h("p", { class: "changes-note" }, h("mark", {}, "Highlighted"), " words are new, and anything longer we took out is listed above. ",
       h("button", { type: "button", class: "link", onclick: clearHighlights }, "Hide highlights")) : null,
     draft.privacy_flags.length ? h("p", { class: "notice" }, "Heads up, this looks like contact details: " + draft.privacy_flags.map(f => f.text).join(", ") + ". You decide what stays in.") : null,
     h("div", { class: "ask" },
       h("label", { for: "ask-text" }, "Want us to change anything?"),
       h("p", { class: "fine" }, "Tell us in your own words. Nothing changes until you ask, and you can still edit by hand."),
       askBox, askButton),
-    h("p", { class: "fine" }, flow.ai_notice),
     noticeBox(),
-    primary("Next Step", () => go("photo")),
-    links(["Back to answers", () => go(flow.questions[0].id)], ["Start over", startOver]));
+    primary("I'm Happy With This", finish),
+    links(["Back to answers", () => go(flow.questions[0].id)], ["Start over", startOver])));
   queueMicrotask(growPost);  // sizes the post box once it is on the page
   return screen;
 }
@@ -509,7 +479,7 @@ function draftScreen() {
 async function start() {
   try { flow = await api("/flow"); }
   catch (err) { document.getElementById("app").textContent = err.message; return; }
-  const known = ["intro", "draft", "write", "photo", "privacy", ...flow.questions.map(q => q.id)];
+  const known = ["intro", "draft", "write", ...flow.questions.map(q => q.id)];
   if (!known.includes(state.step) || (state.step === "draft" && !state.draft)) state.step = "intro";
   // A tab opened before the questions changed may still hold answers or options that no longer exist.
   const helpIds = (flow.questions.find(q => q.id === "help") || { options: [] }).options.map(o => o.id);

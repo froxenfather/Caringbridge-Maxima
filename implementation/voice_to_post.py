@@ -115,7 +115,7 @@ def listen():
 
 
 def parse_picks(text, options):
-    """'1, 3' -> ['rides', 'visits'].
+    """'1, 3' -> ['childcare', 'errands'].
     Returns None if it isn't a valid list."""
     picked = []
     for word in text.replace(",", " ").split():

@@ -2,7 +2,7 @@
 
 The "Help Me Find the Words" path of the first-post flow, as a web page backed by a small API.
 Three short questions, then an AI writes a first draft in the author's own words, titled "Today's Update".
-The author edits it, or types what they'd like changed and gets a rewrite from one more AI call, with the changed words highlighted.
+The author edits it, or types what they'd like changed and gets a rewrite from one more AI call, with the new words highlighted in faint berry pink and any longer stretch it took out listed under the post, struck through.
 Nothing is ever published, and nothing is stored on the server.
 
 ## Run it on your computer
@@ -22,10 +22,13 @@ There is also a terminal version of the same flow, `python voice_to_post.py` (ad
 
 ## The screens
 
-Intro, then Questions 1 to 3 (what's happened so far, what's coming up next, and how others can help), then the first draft with a box under it to tell the AI what to change.
-Meals, gift cards and fundraising are deliberately not offered on Question 3, because CaringBridge has its own plans for those.
+Intro, then Steps 1 to 4: what's happened so far, what's coming up next, how others can help, and the first draft with a box under it to tell the AI what to change.
+The berry panel on the right shows the steps on every screen, and a finished step can be clicked to go back to it.
+The options on Step 3 are CaringBridge's Requests list (Childcare, Chores, Errands, Meals, Petcare, Transportation, Visiting).
+Every AI-assisted screen has a small AI note in the bottom-left corner.
+The photo and privacy steps were taken out for now, so the draft is the last step.
 The words on every question come from `backend/flow.py`, so a copy change from Figma is an edit in that one file.
-On the intro screen, choosing "I'd Like to Write It Myself" (or Previous, or Skip for now) shows a gentle "not built yet" message.
+Choosing "I'd Like to Write It Myself" on the intro screen opens a blank post. Previous and Skip for now on the intro screen show a gentle "not built yet" message.
 The stand-in sign-up details (Sam writing about Robert) are at the top of `public/app.js` until the real sign-up steps are connected.
 
 Talking on Questions 1 and 2 records in the browser, sends the clip to the API, and puts the words in the box, where they stay editable.
@@ -104,7 +107,7 @@ If a rewrite ever fails for another reason, the server logs a line like "The AI 
 
 ## Not done yet
 
-- "I'd Like to Write It Myself", and Steps 1, 3 and 4 of the CaringBridge sign-up.
+- Steps 1, 3 and 4 of the CaringBridge sign-up, the photo and privacy steps, and publishing.
 - The bold, italic, link and image toolbar on the post.
 - The "What has been captured" line under the questions.
 - Words appearing live while someone talks, and undo for a rewrite the author doesn't like.

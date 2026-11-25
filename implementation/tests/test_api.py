@@ -33,7 +33,7 @@ def test_draft(fake_ai):
     assert response.status_code == 200
     assert response.json() == {"title": "Today's Update", "post": "We got news this week.", "privacy_flags": []}
     assert len(fake_ai.calls) == 1
-    assert "Author: Sam" in fake_ai.calls[0]["user"] and "Rides, Prayers" in fake_ai.calls[0]["user"]
+    assert "Author: Sam" in fake_ai.calls[0]["user"] and "Errands, Meals" in fake_ai.calls[0]["user"]
 
 
 def test_an_older_tab_with_removed_answers_still_works(fake_ai):

@@ -31,6 +31,6 @@ def fake_ai(monkeypatch):
 ANSWERS = {
     "what_happened": "Mom fell last week and broke her hip.",
     "what_next": "Surgery is on Thursday.",
-    "help": ["rides", "prayers"],
+    "help": ["errands", "meals"],
     "profile": {"author_name": "Sam", "page_for": "Mom", "relationship": "son"},
 }

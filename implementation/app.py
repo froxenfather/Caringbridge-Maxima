@@ -81,7 +81,7 @@ def run(work):
 def get_flow():
     """The questions, options and sliders, so the front end draws them from here."""
     return {"questions": flow.QUESTIONS, "sliders": flow.SLIDERS,
-            "slider_default": flow.SLIDER_DEFAULT, "ai_notice": flow.AI_NOTICE,
+            "slider_default": flow.SLIDER_DEFAULT, "ai_notice": flow.AI_NOTICE, "ai_disclaimer": flow.AI_DISCLAIMER,
             "default_title": flow.DEFAULT_TITLE}
 
 

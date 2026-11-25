@@ -3,8 +3,9 @@
   --plum: #963862;
   --plum-dark: #7d2c52;
   --plum-tint: #f6edf1;
-  --changed: #fbeec0;
-  --changed-edge: #e3c45c;
+  --changed: #f8e3ec;       /* a faint berry pink for words the AI just added */
+  --changed-edge: #e5b5c9;
+  --link: #495dba;
   --green: #2e7d52;
   --green-tint: #e2f3e8;
   --red: #c0283d;
@@ -21,44 +22,56 @@ h1:focus { outline: none; }
 :focus-visible { outline: 3px solid rgba(150, 56, 98, 0.35); outline-offset: 1px; }
 
 .eyebrow { font-size: 0.875rem; color: var(--muted); margin: 0 0 0.5rem; }
-.lead { margin: 0 0 1.25rem; color: var(--muted); }
+.lead { margin: 0 0 1.75rem; color: var(--muted); line-height: 1.55; }
+.intro-lead { margin-bottom: 2.5rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .fine { font-size: 0.8rem; color: var(--muted); }
 .mobile-logo { display: none; }
 
-/* The question screens: content on the left, the plum steps panel on the right. */
-.wizard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(17rem, 42%); min-height: 100vh; }
-.wizard-main { display: flex; flex-direction: column; padding: 2rem 2.5rem 1.25rem; }
-.step-box { width: 100%; max-width: 30rem; margin: auto; }
-.wizard-side { background: var(--plum); color: #fff; display: flex; flex-direction: column; justify-content: center; gap: 2.5rem; padding: 2rem 3rem; }
-.side-logo { width: min(16rem, 80%); align-self: center; }
+/* Every screen: content on the left, the berry steps panel on the right. */
+.wizard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(17rem, 40%); min-height: 100vh; }
+.wizard.wide { grid-template-columns: minmax(0, 1fr) minmax(16rem, 32%); }
+.wizard-main { display: flex; flex-direction: column; padding: 3rem 3.5rem 1.5rem; }
+.step-box { width: 100%; max-width: 32rem; margin: auto; padding: 1rem 0 2rem; }
+.wizard.wide .step-box { max-width: 42rem; }
+.ai-disclaimer { display: flex; gap: 0.4rem; align-items: baseline; margin: 0; max-width: 32rem; font-size: 0.75rem; color: var(--muted); }
+
+/* The panel stays put while a long draft scrolls. The logo sits at the top, the steps fill the middle. */
+.wizard-side { position: sticky; top: 0; height: 100vh; align-self: start; background: var(--plum); color: #fff; display: flex; flex-direction: column; align-items: center; padding: 3rem 2.5rem; }
+.side-logo { width: min(13rem, 75%); }
+.side-steps { margin: auto 0; padding: 2rem 0; }
 
 .steps { list-style: none; margin: 0; padding: 0; }
-.steps li { position: relative; padding: 0 0 1.6rem 2.25rem; font-size: 0.8rem; }
-.steps li::before { content: ""; position: absolute; left: 0; top: 0.1rem; width: 1.15rem; height: 1.15rem; border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%; display: grid; place-items: center; font-size: 0.7rem; }
-.steps li::after { content: ""; position: absolute; left: 0.55rem; top: 1.45rem; bottom: 0.2rem; width: 2px; background: rgba(255, 255, 255, 0.45); }
+.steps li { position: relative; padding-bottom: 3.5rem; }
+.steps li:last-child { padding-bottom: 0; }
+.steps li::after { content: ""; position: absolute; left: calc(0.875rem - 1px); top: 2.15rem; bottom: 0.4rem; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.35); }
+.steps li.done::after { background: rgba(255, 255, 255, 0.85); }
 .steps li:last-child::after { display: none; }
-.steps .done::before { content: "\2713"; }
-.steps .current::before { background: #fff; box-shadow: inset 0 0 0 3px var(--plum); }
-.steps small { display: block; opacity: 0.8; }
-.steps b { display: block; font-size: 0.95rem; }
 
-.progress { display: flex; gap: 0.75rem; width: 100%; max-width: 30rem; margin: 1.5rem auto 0; }
-.progress span { flex: 1; height: 4px; border-radius: 2px; background: #e3e5e8; }
-.progress .on { background: var(--plum); }
+.step-item { position: relative; display: block; padding: 0.1rem 0 0 2.9rem; min-height: 1.75rem; font-size: 0.8rem; text-align: left; color: inherit; background: none; border: 0; }
+.step-item::before { content: ""; position: absolute; left: 0; top: 0.15rem; width: 1.75rem; height: 1.75rem; box-sizing: border-box; border: 2px solid rgba(255, 255, 255, 0.75); border-radius: 50%; display: grid; place-items: center; font-size: 0.85rem; font-weight: 700; }
+.step-item small { display: block; opacity: 0.8; }
+.step-item b { display: block; font-size: 1rem; font-weight: 600; }
+.done .step-item::before { content: "\2713"; background: #fff; border-color: #fff; color: var(--plum); }
+.current .step-item::before { border-color: #fff; background: radial-gradient(circle, #fff 0 0.3rem, transparent 0.33rem); animation: step-pulse 2.4s ease-out infinite; }
+.steps li:not(.done):not(.current) .step-item { opacity: 0.75; }
+button.step-item { cursor: pointer; }
+button.step-item:hover b { text-decoration: underline; text-underline-offset: 3px; }
+button.step-item:focus-visible { outline: 3px solid rgba(255, 255, 255, 0.7); outline-offset: 4px; border-radius: 4px; }
+@keyframes step-pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.5); } 70%, 100% { box-shadow: 0 0 0 0.65rem rgba(255, 255, 255, 0); } }
+@media (prefers-reduced-motion: reduce) { .current .step-item::before { animation: none; } }
 
-.card { display: flex; gap: 0.75rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 0.75rem; cursor: pointer; }
+.card { display: flex; gap: 0.9rem; padding: 1.15rem 1.25rem; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 1rem; cursor: pointer; }
 .card.selected { border-color: var(--plum); box-shadow: 0 0 0 1px var(--plum); background: var(--plum-tint); }
 .card input { accent-color: var(--plum); margin-top: 0.3rem; }
 .card strong { display: block; }
-.card-text { display: block; font-size: 0.9rem; color: var(--muted); }
-.how { margin: 0 0 1rem; font-size: 0.9rem; color: var(--muted); }
-.how b { color: var(--text); }
+.card-text { display: block; margin-top: 0.2rem; font-size: 0.9rem; color: var(--muted); }
 
 .text { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem; background: #fff; }
-textarea.text { min-height: 7.5rem; resize: vertical; }
+textarea.text { min-height: 9rem; resize: vertical; line-height: 1.5; }
 .voice-tag { display: inline-flex; align-items: center; gap: 0.3rem; margin-left: 0.6rem; padding: 0.1rem 0.55rem; border-radius: 999px; background: var(--plum-tint); color: var(--plum); font-size: 0.8rem; font-weight: 500; vertical-align: middle; }
 .voice-tag .mic-icon { width: 0.9rem; height: 0.9rem; }
-.mic { display: inline-flex; align-items: center; gap: 0.6rem; border: 1px solid var(--plum); border-radius: 999px; padding: 0.3rem 1rem 0.3rem 0.3rem; margin: 0.75rem 0 1rem; font-size: 0.9rem; font-weight: 500; cursor: pointer; background: #fff; color: var(--plum); }
+.mic { display: inline-flex; align-items: center; gap: 0.6rem; border: 1px solid var(--plum); border-radius: 999px; padding: 0.3rem 1rem 0.3rem 0.3rem; margin: 1rem 0 1.25rem; font-size: 0.9rem; font-weight: 500; cursor: pointer; background: #fff; color: var(--plum); }
 .mic:hover { background: var(--plum-tint); }
 .mic-badge { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 50%; background: var(--plum); color: #fff; }
 .mic-icon { width: 1.15rem; height: 1.15rem; }
@@ -68,30 +81,24 @@ textarea.text { min-height: 7.5rem; resize: vertical; }
 @keyframes pulse { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .mic.listening .mic-badge { animation: none; } }
 
-.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 1.25rem; }
-.chip { display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 0.45rem 0.75rem; cursor: pointer; }
-.chip[aria-pressed="true"] { background: var(--green-tint); border-color: var(--green); }
-.chip[aria-pressed="true"]::before { content: "\2713"; width: 1.1rem; height: 1.1rem; display: grid; place-items: center; font-size: 0.7rem; border-radius: 50%; background: var(--green); color: #fff; }
+/* The help options: a clean list, one option per line. */
+.checklist { border: 0; margin: 0 0 1.5rem; padding: 0; border-top: 1px solid #e3e5e8; }
+.check-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.8rem 0.25rem; border-bottom: 1px solid #e3e5e8; cursor: pointer; }
+.check-row:hover { background: var(--plum-tint); }
+.check-row input { width: 1.15rem; height: 1.15rem; margin: 0; accent-color: var(--plum); }
+.check-row:has(input:checked) span { font-weight: 600; }
 
-.primary { width: 100%; margin-top: 1rem; border: 0; border-radius: 4px; padding: 0.9rem; background: var(--plum); color: #fff; font-weight: 600; cursor: pointer; }
+.primary { width: 100%; margin-top: 1.5rem; border: 0; border-radius: 4px; padding: 0.9rem; background: var(--plum); color: #fff; font-weight: 600; cursor: pointer; }
 .primary:hover { background: var(--plum-dark); }
 .primary:disabled { opacity: 0.55; cursor: default; }
-.links { display: flex; justify-content: space-between; margin-top: 0.75rem; font-size: 0.9rem; }
-.link { background: none; border: 0; padding: 0; color: var(--plum); text-decoration: underline; cursor: pointer; }
+.links { display: flex; justify-content: space-between; margin-top: 1rem; font-size: 0.9rem; }
+.link { background: none; border: 0; padding: 0; color: var(--link); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.link:hover { color: var(--plum); }
 .notice { margin: 0.75rem 0 0; padding: 0.7rem 0.9rem; border-left: 4px solid var(--plum); border-radius: 4px; background: var(--plum-tint); font-size: 0.95rem; }
 
 .write-screen label { display: block; margin: 1rem 0 0.35rem; font-weight: 500; }
 
-.photo-upload { margin: 1rem 0; }
-.photo-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; border: 2px dashed var(--line); border-radius: 8px; padding: 2.5rem 1rem; cursor: pointer; text-align: center; color: var(--muted); }
-.photo-drop:hover { border-color: var(--plum); color: var(--plum); }
-.photo-upload input[type="file"] { display: none; }
-.photo-preview { max-width: 100%; max-height: 14rem; border-radius: 8px; display: block; margin: 0 auto; }
-.photo-hint { font-size: 0.8rem; }
-.photo-actions { display: flex; justify-content: center; gap: 1.5rem; margin-top: 0.75rem; font-size: 0.9rem; }
-
-/* The draft screen: one column, the post first and the "change anything?" box under it. */
-.draft { max-width: 44rem; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+/* The draft screen: the post first and the "change anything?" box under it. */
 .banner { margin: 0 0 1.25rem; padding: 0.75rem 1rem; border-radius: 6px; background: var(--green-tint); }
 .draft label { display: block; margin: 1rem 0 0.35rem; font-weight: 500; }
 .text.changed { background: var(--changed); border-color: var(--changed-edge); }
@@ -102,10 +109,16 @@ textarea.text { min-height: 7.5rem; resize: vertical; }
 .post-backdrop { position: absolute; inset: 0; color: transparent; background: #fff; border-radius: 6px; overflow: hidden; pointer-events: none; }
 .post-backdrop mark { color: transparent; background: var(--changed); border-radius: 3px; box-shadow: 0 0 0 2px var(--changed); }
 textarea.post { position: relative; display: block; min-height: 22rem; background: transparent; border-color: var(--line); overflow: hidden; resize: none; }
+/* What a rewrite took out: small, grey and struck through, under the post. */
+.removed { margin: 0.75rem 0 0; padding: 0.6rem 0.9rem; border-left: 3px solid var(--line); border-radius: 4px; background: #f6f7f8; font-size: 0.8rem; color: var(--muted); }
+.removed-title { margin: 0 0 0.25rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.7rem; }
+.removed ul { margin: 0; padding: 0; list-style: none; }
+.removed li + li { margin-top: 0.3rem; }
+.removed del { text-decoration-color: rgba(93, 102, 115, 0.6); }
 .changes-note { font-size: 0.85rem; color: var(--muted); margin: 0.5rem 0 0; }
 .changes-note mark { background: var(--changed); color: var(--text); border-radius: 3px; padding: 0 0.2rem; }
 
-.ask { margin-top: 1.5rem; padding-top: 0.25rem; border-top: 1px solid #dcdfe3; }
+.ask { margin-top: 2rem; padding-top: 0.5rem; border-top: 1px solid #dcdfe3; }
 .ask label { margin-bottom: 0.15rem; }
 .ask .fine { margin: 0 0 0.5rem; }
 .secondary { margin-top: 0.6rem; border: 1px solid var(--plum); border-radius: 4px; padding: 0.6rem 1.1rem; background: #fff; color: var(--plum); font-weight: 600; cursor: pointer; }
@@ -113,10 +126,10 @@ textarea.post { position: relative; display: block; min-height: 22rem; backgroun
 .secondary:disabled { opacity: 0.5; cursor: default; }
 
 @media (max-width: 52rem) {
-  .wizard { grid-template-columns: 1fr; }
+  .wizard, .wizard.wide { grid-template-columns: 1fr; }
   .wizard-side { display: none; }
   .wizard-main { padding: 1.25rem 1rem; }
+  .step-box { padding-top: 0; }
   .mobile-logo { display: block; width: 11rem; margin-bottom: 1.5rem; }
-  .draft { padding: 1.25rem 1rem 2rem; }
   h1 { font-size: 1.6rem; }
 }
